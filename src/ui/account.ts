@@ -21,7 +21,7 @@ export function renderAcct() {
     return `<dt><span class="led ${led}"></span><span>${esc(label)} <span class="mono">${n}</span></span></dt><dd>${txt}</dd>`;
   }).join("");
   const conns = NS.mcp ? [...appNames(), SRV.cloud].map(n => {
-    const [led, txt] = appState(n), p = S.perms["mcp:" + n], label = n === SRV.cloud ? "Scheduled tasks" : n, does = n === SRV.cloud ? "waking dots in the cloud" : appInfo(n).does;
+    const [led, txt] = appState(n), p = S.perms["mcp:" + n], label = n === SRV.cloud ? "Scheduled tasks" : n, does = n === SRV.cloud ? "waking atoms in the cloud" : appInfo(n).does;
     const btn = led === "wait" && p !== "granted" ? `<button class="mini" data-act="allow" data-id="${esc(n)}">Allow</button>` : "";
     return `<dt><span class="led ${led}"></span><span>${esc(label)} <span class="mono">${esc(does)}</span></span></dt><dd>${esc(txt)}${btn}</dd>`;
   }).join("") : "";
@@ -31,7 +31,7 @@ export function renderAcct() {
     ${conns ? `<div class="col" style="gap:8px"><span class="eyebrow">Your apps</span><dl class="signals">${conns}</dl><div class="row"><button class="btn ghost sm" data-nav="apps">Manage apps</button></div></div>` : ""}
     <div class="row">${askable && NS.permissions ? `<button class="btn sm" data-act="allow-all">Allow everything once</button>` : ""}${NS.permissions ? `<button class="btn ghost sm" data-act="perms">Manage access</button>` : ""}</div>
     <div class="col issues" style="gap:6px"><span class="eyebrow">Recent issues</span>${S.diag.length ? `<ul>${S.diag.slice(-6).reverse().map(x => `<li>${esc(fmtTime(x.at))} · ${esc(x.where)} · ${esc(x.code)}${x.msg ? " — " + esc(x.msg.slice(0, 120)) : ""}</li>`).join("")}</ul><div class="row"><button class="btn ghost sm" data-act="clear-diag">Clear</button></div>` : `<span>None. Everything this page tried has worked.</span>`}</div>
-    <p class="fine">Dotworks ${VERSION} · runs on your own Claude plan and your own apps. Dots, notes and asks are private to you; seeds are shared with everyone who can open this page. Keys: N new · W wake · [ ] switch dots · / message.</p>`;
+    <p class="fine">Atoms ${VERSION} · runs on your own Claude plan and your own apps. Atoms, notes and asks are private to you; elements you share are seen by everyone who can open this page. Keys: N new · W wake · [ ] switch atoms · / message.</p>`;
 }
 export async function allow(server) {
   if (!NS.permissions && !NS.mcp) return;

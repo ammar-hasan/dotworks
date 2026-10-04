@@ -1,15 +1,15 @@
 ---
-name: dotworks
-description: Set up, update or republish your own copy of Dotworks (a claude.ai artifact built from this repo). Use when asked to "set up Dotworks", "update Dotworks", "finish Dotworks setup", add a newly connected app to Dotworks, or publish the latest code.
+name: atoms
+description: Set up, update or republish your own copy of Atoms (formerly Dotworks), a claude.ai artifact built from this repo. Use when asked to "set up Atoms", "update Atoms", "finish Atoms setup" (or the same with Dotworks), add a newly connected app to Atoms, or publish the latest code.
 ---
 
-# Dotworks: set up or update your copy
+# Atoms: set up or update your copy
 
-Dotworks is one page published as a claude.ai artifact. Everyone runs their own copy: the same code, their own connectors, their own dots and data. This skill builds the page from this repo, declares the person's own connectors, publishes it, and fills the artifact's store with what the page and its cloud wakes need.
+Atoms is one page published as a claude.ai artifact. Everyone runs their own copy: the same code, their own connectors, their own atoms and data. This skill builds the page from this repo, declares the person's own connectors, publishes it, and fills the artifact's store with what the page and its cloud wakes need.
 
 It needs a Claude session on claude.ai with this repo cloned and the **Artifact** and **ArtifactData** tools (load them with ToolSearch if they are deferred). Claude Code in a terminal can build and test but can't publish artifacts: say so and stop if those tools aren't available.
 
-Never create routines, run tools in the person's apps, or edit their dots from here: the page does that, with their approval.
+Never create routines, run tools in the person's apps, or edit their atoms from here: the page does that, with their approval.
 
 ## 1. Build and check
 
@@ -18,7 +18,7 @@ npm ci            # or npm install when there is no package-lock.json
 npm run check     # typecheck + build + behaviour tests
 ```
 
-Stop and report if anything fails. A good build prints `built dist/dotworks.html · … · runbook vN` and the tests end with `ALL PASSED`.
+Stop and report if anything fails. A good build prints `built dist/atoms.html · … · runbook vN` and the tests end with `ALL PASSED`.
 
 ## 2. Declare their connectors
 
@@ -32,20 +32,20 @@ Stop and report if anything fails. A good build prints `built dist/dotworks.html
 3. `npm run manifest` writes `dist/capabilities.json` and prints each app with its tool count, plus warnings:
    - *no tools visible / turned off for this chat*: that connector's tools aren't in this session. Tell the person they can turn it on for this chat and run this again, or go ahead without it.
    - *offers N tools, a page may declare 128*: some tools were left out (named). That's fine; mention it.
-   - *Claude Code Remote not seen*: dots will still wake in the app, but "Keep it awake" (cloud wakes) won't work for them.
+   - *Claude Code Remote not seen*: atoms will still wake in the app, but "Keep it awake" (cloud wakes) won't work for them.
 
-## 3. Find their Dotworks
+## 3. Find their Atoms
 
 - If the person gave an artifact link, use it.
-- Otherwise **Artifact** `action: "list"` (`scope: "mine"`, `limit: 50`) and look for the title **Dotworks**. One match: use it. Several: ask which (AskUserQuestion, with each one's last-updated time). None: this is a first setup.
+- Otherwise **Artifact** `action: "list"` (`scope: "mine"`, `limit: 50`) and look for the title **Atoms** (copies published before the rename are titled **Dotworks**). One match: use it. Several: ask which (AskUserQuestion, with each one's last-updated time). None: this is a first setup.
 - Only publish to an artifact the person owns or can edit ("writer" when read).
 
 ## 4. Publish
 
 Pass the JSON object in `dist/capabilities.json` as `capabilities` (read the file; send it as an object, not a string).
 
-- **Update** (an artifact was found): first **Artifact** `action: "read"` with its `url` (a publish to it is refused otherwise), then publish with `file_path: "dist/dotworks.html"`, the same `url`, `capabilities`, and a short `label` such as "v6.2" (the version is in package.json). No `icon`.
-- **First setup**: publish with `file_path: "dist/dotworks.html"`, `icon: "robot"`, `capabilities`, and `description: "Small character assistants that read your apps and ask before they act."`
+- **Update** (an artifact was found): first **Artifact** `action: "read"` with its `url` (a publish to it is refused otherwise), then publish with `file_path: "dist/atoms.html"`, the same `url`, `capabilities`, and a short `label` such as "v6.2" (the version is in package.json). No `icon`.
+- **First setup**: publish with `file_path: "dist/atoms.html"`, `icon: "robot"`, `capabilities`, and `description: "Small character assistants that read your apps and ask before they act."`
 
 If the manifest gained tools or apps since the last publish, each viewer approves the new ones once: tell the person.
 
@@ -66,12 +66,12 @@ All with **ArtifactData**, `url` = the artifact. Read each document first and pi
 Keep it short:
 - Published (the card carries the link), and what changed if it was an update.
 - The apps it can use, from the manifest output, and anything left out and why.
-- On a first setup, how to start: open it and allow apps when asked; plant a seed or make a dot; **Keep it awake** gives a dot its own routine. Claude can't attach apps to a routine a page creates, so on the routine's page (the app links to it) they open Edit → Connectors and tick the apps that dot reads; the app shows which are missing until they do.
+- On a first setup, how to start: open it and allow apps when asked; add one from Elements or make their own; **Keep it awake** gives an atom its own routine. Claude can't attach apps to a routine a page creates, so on the routine's page (the app links to it) they open Edit → Connectors and tick the apps that atom reads; the app shows which are missing until they do.
 
-## "Finish Dotworks setup"
+## "Finish Atoms setup"
 
 The page asks for this when `meta/app` is missing. Do step 3, then only the `meta/app` row of step 5. Nothing needs rebuilding.
 
 ## Updating later
 
-"Update Dotworks" (new code, or a newly connected app) is steps 1 to 6 again against the same artifact link, so dots, asks and routines carry on. Run `git pull` first when the person wants the latest code.
+"Update Atoms" (new code, or a newly connected app) is steps 1 to 6 again against the same artifact link, so atoms, asks and routines carry on. Run `git pull` first when the person wants the latest code.

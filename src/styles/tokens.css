@@ -1,12 +1,12 @@
-/* Layout: an app shell — a sidebar of your dots (little characters with faces), a living Home field,
-   a chat per dot (notes arrive as its messages, asks inline), an Asks inbox and a Seeds gallery.
+/* Layout: an app shell — a sidebar of your atoms (little characters with faces), a living Home field,
+   a chat per atom (notes arrive as its messages, asks inline), an Asks inbox and an Elements gallery.
    Display type is a dot-matrix face; notes speak in a serif; the UI is a quiet grotesk. Dark-first, fog-light variant. */
 :root{
   --bg:#08090D; --bg-2:#0B0C11; --side:#0D0E14; --panel:#13151C; --panel-2:#1A1D26; --paper:#151821;
   --ink:#EEF0F6; --ink-2:#BAC0CE; --muted:#8A91A3; --faint:#4D5366;
   --line:rgb(255 255 255 / .07); --line-2:rgb(255 255 255 / .12); --hover:rgb(255 255 255 / .045); --sel:rgb(255 255 255 / .085);
   --accent:#C9D1FF; --ok:#74DBA5; --warn:#F2C46B; --on-warn:#1B1405; --bad:#FF8C84; --cloud:#9FD7FF;
-  --you:#232733; --eye:#0A0B10; --glow:.55; --sky:236 238 244; --l1:78%; --l2:58%; --l3:30%;
+  --you:#232733; --eye:#0A0B10; --glow:.55; --sky:236 238 244; --l1:78%; --l2:58%; --l3:30%; --el-l:86%; --orbit-a:.2;
   --shadow:0 24px 70px rgb(0 0 0 / .5); --shadow-sm:0 6px 24px rgb(0 0 0 / .25);
   --f-ui:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-dot:"Doto","Geist Mono",ui-monospace,Menlo,monospace;
@@ -19,14 +19,14 @@
   --ink:#11131A; --ink-2:#353A48; --muted:#5C6374; --faint:#A0A6B4;
   --line:rgb(17 19 26 / .08); --line-2:rgb(17 19 26 / .14); --hover:rgb(17 19 26 / .045); --sel:rgb(17 19 26 / .08);
   --accent:#3445C9; --ok:#17784A; --warn:#93600C; --on-warn:#FFFFFF; --bad:#B4372F; --cloud:#1F6FA6;
-  --you:#E4E8F1; --eye:#0A0B10; --glow:.32; --sky:40 46 70; --l1:76%; --l2:54%; --l3:36%;
+  --you:#E4E8F1; --eye:#0A0B10; --glow:.32; --sky:40 46 70; --l1:76%; --l2:54%; --l3:36%; --el-l:52%; --orbit-a:.42;
   --shadow:0 24px 60px rgb(20 24 40 / .16); --shadow-sm:0 6px 20px rgb(20 24 40 / .08); color-scheme:light }}
 :root[data-theme="light"]{
   --bg:#ECEEF3; --bg-2:#F3F4F8; --side:#E9ECF2; --panel:#FFFFFF; --panel-2:#F5F6FA; --paper:#FFFFFF;
   --ink:#11131A; --ink-2:#353A48; --muted:#5C6374; --faint:#A0A6B4;
   --line:rgb(17 19 26 / .08); --line-2:rgb(17 19 26 / .14); --hover:rgb(17 19 26 / .045); --sel:rgb(17 19 26 / .08);
   --accent:#3445C9; --ok:#17784A; --warn:#93600C; --on-warn:#FFFFFF; --bad:#B4372F; --cloud:#1F6FA6;
-  --you:#E4E8F1; --eye:#0A0B10; --glow:.32; --sky:40 46 70; --l1:76%; --l2:54%; --l3:36%;
+  --you:#E4E8F1; --eye:#0A0B10; --glow:.32; --sky:40 46 70; --l1:76%; --l2:54%; --l3:36%; --el-l:52%; --orbit-a:.42;
   --shadow:0 24px 60px rgb(20 24 40 / .16); --shadow-sm:0 6px 20px rgb(20 24 40 / .08); color-scheme:light }
 
 *{box-sizing:border-box}

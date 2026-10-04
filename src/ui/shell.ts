@@ -15,7 +15,7 @@ export function renderAll() {
 }
 export function renderShell() {
   const n = pending().length;
-  const navItems = [["home", "Home", ICON.home, ""], ["asks", "Asks", ICON.inbox, n ? String(n) : ""], ["seeds", "Seeds", ICON.sprout, ""], ["apps", "Apps", ICON.plug, ""]];
+  const navItems = [["home", "Home", ICON.home, ""], ["asks", "Asks", ICON.inbox, n ? String(n) : ""], ["seeds", "Elements", ICON.atom, ""], ["apps", "Apps", ICON.plug, ""]];
   const navHtml = navItems.map(([v, label, ic, c]) => `<button class="nav-i" data-nav="${v}" ${S.view === v ? 'aria-current="page"' : ""}>${ic}<span>${label}</span><span class="count">${c}</span></button>`).join("");
   if ($("#nav").innerHTML !== navHtml) $("#nav").innerHTML = navHtml;
   if (!$("#sideNew").innerHTML) $("#sideNew").innerHTML = ICON.plus;
@@ -31,12 +31,12 @@ export function renderShell() {
 /* what this view can't do, said once, plainly, with the way out */
 export function capIssues() {
   if (!S.booted) return [];
-  if (!S.env.use) return [{ key: "host", html: "<b>This copy of Dotworks can't reach Claude.</b> Open it from your artifacts on claude.ai, signed in, to plant and wake dots." }];
+  if (!S.env.use) return [{ key: "host", html: "<b>This copy of Atoms can't reach Claude.</b> Open it from your artifacts on claude.ai, signed in, to make and wake atoms." }];
   if (!NS.user || !S.uid) return [];
   const out = [];
-  if (!NS.db) out.push({ key: "db", html: "<b>Memory is off in this view</b>, so new dots can't be saved here. Turn it on from this page's Permissions, or open it from claude.ai in a browser.", fix: true });
-  if (!S.capsLeft && !NS.sample) out.push({ key: "sample", html: "<b>Claude isn't available in this view</b>, so dots can't wake or chat. Open the page from claude.ai in a browser.", fix: true });
-  else if (NS.sample && (S.perms as any).sample === "denied") out.push({ key: "sample-off", html: "<b>Claude is turned off for this page</b>, so dots can't wake or chat until you allow it.", fix: true });
+  if (!NS.db) out.push({ key: "db", html: "<b>Memory is off in this view</b>, so new atoms can't be saved here. Turn it on from this page's Permissions, or open it from claude.ai in a browser.", fix: true });
+  if (!S.capsLeft && !NS.sample) out.push({ key: "sample", html: "<b>Claude isn't available in this view</b>, so atoms can't wake or chat. Open the page from claude.ai in a browser.", fix: true });
+  else if (NS.sample && (S.perms as any).sample === "denied") out.push({ key: "sample-off", html: "<b>Claude is turned off for this page</b>, so atoms can't wake or chat until you allow it.", fix: true });
   return out;
 }
 export function paintBanner() {
@@ -58,9 +58,9 @@ export function dotStatus(d) {
 export function renderDotList(box, where) {
   if (!box) return;
   if (!S.booted) { box.innerHTML = '<div class="dl-empty">…</div>'; return; }
-  if (!S.uid) { box.innerHTML = `<div class="dl-empty">${NS.user ? "Sign in to Claude to make dots." : "Open Dotworks inside Claude to make dots."}</div>`; return; }
+  if (!S.uid) { box.innerHTML = `<div class="dl-empty">${NS.user ? "Sign in to Claude to make atoms." : "Open Atoms inside Claude to make atoms."}</div>`; return; }
   if (!S.dotsLoaded) { box.innerHTML = '<div class="dl-empty"><div class="skel" style="width:70%"></div></div>'; return; }
-  if (!S.dots.length) { const msg = `<div class="dl-empty" data-key="empty">No dots yet. Plant a seed or make your own.</div>`; if (box.innerHTML !== msg) box.innerHTML = msg; return; }
+  if (!S.dots.length) { const msg = `<div class="dl-empty" data-key="empty">No atoms yet. Add one from Elements or make your own.</div>`; if (box.innerHTML !== msg) box.innerHTML = msg; return; }
   reconcile(box, S.dots.map(d => {
     const [st, cl] = dotStatus(d), asks = pending().filter(a => a.dotId === d.id).length;
     const html = `<button class="dl-i" data-key="${esc(d.id)}" data-act="open-dot" data-id="${esc(d.id)}" aria-current="${S.view === "dot" && S.selected === d.id}">${avatarHtml(d, { size: where === "side" ? 34 : 40, state: stateOf(d), badge: asks || "" })}<span class="dl-t"><b>${esc(d.name)}</b><small class="${cl}">${esc(st)}</small></span><span></span></button>`;
@@ -71,7 +71,7 @@ export function renderMe() {
   const el = $("#meBtn"); if (!el) return;
   const issue = S.diag.length ? '<span class="issue" title="Something went wrong — open for details"></span>' : "";
   let html;
-  if (!S.booted) html = `<span><b>Waking up…</b><small>Dotworks ${VERSION}</small></span>`;
+  if (!S.booted) html = `<span><b>Waking up…</b><small>Atoms ${VERSION}</small></span>`;
   else if (!S.uid) html = `<span><b>${NS.user ? "Not signed in" : "Not inside Claude"}</b><small>Signals & access</small></span>${issue}`;
   else html = `<img alt="" src="${esc(S.me?.avatarUrl || "")}"><span><b>${esc(S.me?.name || "You")}</b><small>Signals & access</small></span>${issue}`;
   if (el.innerHTML !== html) el.innerHTML = html;
@@ -89,7 +89,7 @@ export async function renderPeers() {
   const faces = document.createElement("span"); faces.className = "faces";
   for (const id of people.slice(0, 5)) {
     const p = viewers.find(v => keyOf(v) === id), img = document.createElement("img");
-    img.alt = ""; img.src = ps[id]?.avatarUrl || ""; img.title = (ps[id]?.name || "Someone") + (p?.isMe ? " (you)" : "") + (p?.presence?.running ? " · waking a dot" : "");
+    img.alt = ""; img.src = ps[id]?.avatarUrl || ""; img.title = (ps[id]?.name || "Someone") + (p?.isMe ? " (you)" : "") + (p?.presence?.running ? " · waking an atom" : "");
     if (p?.presence?.running) img.className = "busy";
     faces.append(img);
   }

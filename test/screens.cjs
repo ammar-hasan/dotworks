@@ -5,7 +5,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
 const fs = require("fs"), path = require("path");
 const dir = __dirname;
-const page = fs.readFileSync(path.join(dir, "..", "dist", "dotworks.html"), "utf8");
+const page = fs.readFileSync(path.join(dir, "..", "dist", "atoms.html"), "utf8");
 const mock = fs.readFileSync(path.join(dir, "mock-browser.js"), "utf8");
 // mimic the platform's publish skeleton
 const wrapped = `<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui;background:#fafafa}img{max-width:100%}[hidden]{display:none!important}</style></head><body>${page}</body></html>`;

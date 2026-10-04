@@ -12,7 +12,7 @@ import { nextEvent, renderHorizon } from "./horizon";
 export function greet() { const h = new Date().getHours(); return h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; }
 export function summaryLine() {
   const awake = S.dots.filter(cloudOn).length, due = dueDots().length;
-  let s = `${plural(S.dots.length, "dot")} in your field`;
+  let s = `${plural(S.dots.length, "atom")}`;
   if (awake) s += ` · ${awake} awake in the cloud`;
   s += due ? ` · ${due} ready to wake` : " · none due yet";
   const nx = nextEvent();
@@ -23,25 +23,25 @@ export function paintHome() {
   const clock = $("#clock"); if (!clock) return;
   clock.textContent = `${new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })} · ${fmtTime(Date.now())}`;
   const first = (S.me?.name || "").split(" ")[0];
-  let head = "Dotworks", voice = "Small assistants with one job each. They check in, then wait for your say.", again = false;
-  if (!S.booted) voice = "Waking the field…";
-  else if (!NS.user) { head = "Open in Claude"; voice = "Dots run on your own Claude plan with your own Calendar and Gmail. Open this page in Claude to plant one."; }
-  else if (!S.uid) { head = "Sign in"; voice = "Your dots, notes and asks are private to your account."; }
-  else if (!S.dotsLoaded) voice = "Gathering your dots…";
-  else if (!S.dots.length) { head = `${greet()}${first ? ", " + first : ""}`; voice = "Your field is empty. Tap a seed below to plant your first dot — each one grows into a small assistant with one job."; }
+  let head = "Atoms", voice = "Small assistants with one job each. They check in, then wait for your say.", again = false;
+  if (!S.booted) voice = "Waking up…";
+  else if (!NS.user) { head = "Open in Claude"; voice = "Atoms run on your own Claude plan with your own apps. Open this page in Claude to make one."; }
+  else if (!S.uid) { head = "Sign in"; voice = "Your atoms, notes and asks are private to your account."; }
+  else if (!S.dotsLoaded) voice = "Gathering your atoms…";
+  else if (!S.dots.length) { head = `${greet()}${first ? ", " + first : ""}`; voice = "No atoms yet. Tap one below to add it: each is a small assistant with one job."; }
   else if (S.running) {
-    const d = S.dots.find(x => x.id === S.running.dotId); head = `${d?.name || "A dot"} is awake`;
+    const d = S.dots.find(x => x.id === S.running.dotId); head = `${d?.name || "An atom"} is awake`;
     const st = S.running.steps[S.running.steps.length - 1];
     voice = S.running.text ? "Writing you a note…" : st ? st.label + (st.state === "wait" ? "…" : "") : "Thinking it through…";
   } else { const n = pending().length; head = n ? `${plural(n, "ask")} waiting` : `${greet()}${first ? ", " + first : ""}`; if (S.digest?.text) { voice = S.digest.text; again = true; } else voice = summaryLine(); }
   $("#greet").textContent = head;
   const V = $("#voice"); V.textContent = voice;
-  if (again && !S.digestBusy) V.insertAdjacentHTML("beforeend", ` <button class="again" data-act="digest-refresh" title="Read the field again">read again</button>`);
+  if (again && !S.digestBusy) V.insertAdjacentHTML("beforeend", ` <button class="again" data-act="digest-refresh" title="Read them again">read again</button>`);
   let acts = "";
   const notes = S.dots.filter(d => S.latest[d.id]?.headline).length, due = dueDots().length;
   if (S.uid && NS.sample && !S.running && notes >= 2 && !S.digest && !S.digestOff) acts += `<button class="btn" data-act="digest" ${S.digestBusy ? "disabled" : ""}>${S.digestBusy ? "Reading…" : "Sum it up"}</button>`;
   if (S.uid && NS.sample && !S.running && due && S.dots.length) acts += `<button class="btn" data-act="run-due">${ICON.bolt}Wake ${due} due</button>`;
-  if (S.uid && NS.db) acts += `<button class="btn pri" data-act="new">${ICON.plus}New dot</button>`;
+  if (S.uid && NS.db) acts += `<button class="btn pri" data-act="new">${ICON.plus}New atom</button>`;
   const A = $("#homeActions"); if (A.innerHTML !== acts) A.innerHTML = acts;
   paintTell(); renderField(); renderHorizon(); paintPeek(); initSky();
 }
@@ -85,17 +85,17 @@ export function renderField() {
     if (!el) {
       el = document.createElement("button"); el.type = "button"; el.className = "orb-btn" + (it.kind === "ghost" ? " ghost" : ""); el.dataset.key = it.key;
       const dly = (-(i * 1.7) % 9).toFixed(2) + "s"; el.style.setProperty("--i", i);
-      el.innerHTML = it.kind === "ghost" ? `<span class="float" style="--d:${dly}"><span class="ghost-c">${ICON.plus}</span><span class="orb-name">New dot</span><span class="orb-meta">make your own</span></span>`
+      el.innerHTML = it.kind === "ghost" ? `<span class="float" style="--d:${dly}"><span class="ghost-c">${ICON.plus}</span><span class="orb-name">New atom</span><span class="orb-meta">make your own</span></span>`
         : `<span class="float" style="--d:${dly};--dur:${10 + (i % 3) * 1.5}s"><span class="avw"></span><span class="orb-name"></span><span class="orb-meta"></span></span>`;
       field.append(el);
     }
     el.style.left = fieldPts[i].x + "%"; el.style.top = fieldPts[i].y + "%";
-    if (it.kind === "ghost") { el.dataset.act = "new"; el.setAttribute("aria-label", "Make a new dot"); return; }
+    if (it.kind === "ghost") { el.dataset.act = "new"; el.setAttribute("aria-label", "Make a new atom"); return; }
     const avw = el.querySelector(".avw"), nm = el.querySelector(".orb-name"), mt = el.querySelector(".orb-meta");
     let avh, name, meta, mcl = "", label;
     if (it.kind === "seed") {
       const s = it.seed; el.dataset.act = "plant-open"; el.dataset.id = s.key;
-      avh = avatarHtml({ ...s, id: s.key }, { size: av, state: "seed" }); name = s.name; meta = "seed · tap to plant"; label = `Seed: ${s.name}. Open to plant it.`;
+      avh = avatarHtml({ ...s, id: s.key }, { size: av, state: "seed" }); name = s.name; meta = "tap to add"; label = `${s.name}: open to add it.`;
     } else {
       const d = (it as any).dot, asks = pending().filter(a => a.dotId === d.id).length, [st, cl] = dotStatus(d);
       el.dataset.act = "open-dot"; el.dataset.id = d.id;
@@ -110,7 +110,7 @@ export function renderField() {
   for (const el of [...field.children]) if (!keep.has(el.dataset.key)) el.remove();
 }
 
-/* sky: drifting dust + a faint dotted constellation through your dots */
+/* sky: drifting dust + a faint dotted constellation through your atoms */
 export const sky = { canvas: null, ctx: null, parts: [], w: 0, h: 0, dpr: 1, last: 0, rgb: "236 238 244", rgbAt: 0, running: false };
 export function initSky() {
   if (!sky.canvas) {

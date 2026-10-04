@@ -24,7 +24,7 @@ export function paintDot() {
   const canRun = !!NS.sample && !S.running && (S.perms as any).sample !== "denied";
   const act = `${live ? `<button class="btn" data-act="stop" aria-label="Stop">${ICON.stop}<span class="lbl">Stop</span></button>` : `<button class="btn pri" data-act="run" aria-label="Wake" ${canRun ? "" : "disabled"} title="${NS.sample ? "Wake it for a check-in (W)" : "Waking needs Claude in this view"}">${ICON.bolt}<span class="lbl">Wake</span></button>`}
     <details class="menu" id="dvMenu"><summary class="icon-btn" aria-label="More">${ICON.more}</summary><div class="menu-list">
-      ${NS.db && S.canShare !== false ? `<button data-act="share">Share as a seed</button>` : ""}
+      ${NS.db && S.canShare !== false ? `<button data-act="share">Share as an element</button>` : ""}
       ${NS.downloads && S.runs[0]?.text ? `<button data-act="export" data-id="${esc(S.runs[0].id)}">Save latest note (.md)</button>` : ""}
       <button data-act="tab" data-id="settings">Change its look or job</button>
       <button class="danger" data-act="delete-dot">Delete…</button></div></details>`;
@@ -43,7 +43,7 @@ export function paintDot() {
 }
 export function threadHtml(steps) { return steps?.length ? `<ul class="thread">${steps.map(s => `<li><span class="node ${esc(s.state)}"></span><span>${esc(s.label)}</span></li>`).join("")}</ul>` : ""; }
 export function statusCopy(r) {
-  const m = { stopped: "Stopped before it finished.", truncated: "The note was cut short. Narrow the job and wake it again.", not_granted: "Claude isn't allowed on this page yet. Use Signals & access to turn it on.", rate_limited: "Your Claude usage limit was reached. Try again later.", refused: "Claude declined this one. Reword the job.", tools_unavailable: "This view can't run tools, so the dot couldn't read your sources.", session_expired: "Your Claude session expired. Sign in again.", sampling_disabled: "Claude isn't available for this account here." };
+  const m = { stopped: "Stopped before it finished.", truncated: "The note was cut short. Narrow the job and wake it again.", not_granted: "Claude isn't allowed on this page yet. Use Signals & access to turn it on.", rate_limited: "Your Claude usage limit was reached. Try again later.", refused: "Claude declined this one. Reword the job.", tools_unavailable: "This view can't run tools, so the atom couldn't read your sources.", session_expired: "Your Claude session expired. Sign in again.", sampling_disabled: "Claude isn't available for this account here." };
   return m[r.errorCode] || m[r.status] || "It didn't finish. Try waking it again.";
 }
 export function noteBlock(r, d) {
@@ -119,7 +119,7 @@ export function paintComposer() {
   const f = $("#composer"), d = curDot(); if (!f || !d) return;
   const busy = !!(S.chat && S.chat.dotId === d.id), ta = $("#reply"), live = S.running?.dotId === d.id;
   const can = !!NS.sample && (S.perms as any).sample !== "denied";
-  ta.placeholder = can ? `Message ${handleOf(d)}…` : NS.sample ? "Allow Claude on this page to talk to your dots" : "Open this page inside Claude to talk to your dots";
+  ta.placeholder = can ? `Message ${handleOf(d)}…` : NS.sample ? "Allow Claude on this page to talk to your atoms" : "Open this page inside Claude to talk to your atoms";
   ta.disabled = busy || !can || live || !S.runsLoaded;
   const send = $("#replySend");
   if (busy) { send.dataset.act = "chat-stop"; send.type = "button"; send.innerHTML = ICON.stop; send.setAttribute("aria-label", "Stop"); }
@@ -154,6 +154,6 @@ export function paintSettings() {
   const key = d.id + ":" + (S.editDraft.rev || 0);
   if (S.settingsKey === key) return;
   S.settingsKey = key;
-  box.innerHTML = builderHtml(S.editDraft, "edit") + `<section class="card"><span class="eyebrow">Share or remove</span><div class="row">${NS.db && S.canShare !== false ? `<button class="btn sm" data-act="share">Share as a seed</button>` : ""}<button class="btn ghost sm danger" data-act="delete-dot">Delete ${esc(d.name)}…</button></div></section>`;
+  box.innerHTML = builderHtml(S.editDraft, "edit") + `<section class="card"><span class="eyebrow">Share or remove</span><div class="row">${NS.db && S.canShare !== false ? `<button class="btn sm" data-act="share">Share as an element</button>` : ""}<button class="btn ghost sm danger" data-act="delete-dot">Delete ${esc(d.name)}…</button></div></section>`;
   paintPeoplePicker("edit");
 }

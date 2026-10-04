@@ -32,7 +32,7 @@ function guess(text: string) {
 
 function routePrompt(text: string) {
   const list = S.dots.map(d => `- ${d.id}: "${clean(d.name)}". Job: ${clean(d.responsibility).replace(/\s+/g, " ").slice(0, 260)} Reads: ${normSources(d.sources).map(shortOf).join(", ") || "nothing"}.${normRepos(d.repos).mode !== "none" ? " Watches GitHub repos." : ""}`).join("\n");
-  return `The owner of a set of personal assistant "dots" typed a message for them. Each dot has one job. Pick the dot whose job this message belongs to.\nThe message:\n"""${text.slice(0, 1200)}"""\nTheir dots:\n${list}\nReply with only one JSON object: {"dot": "<the id of the best dot, or none if no dot's job covers this>", "sure": true or false}`;
+  return `The owner of a set of personal assistant "atoms" typed a message for them. Each atom has one job. Pick the atom whose job this message belongs to.\nThe message:\n"""${text.slice(0, 1200)}"""\nTheir atoms:\n${list}\nReply with only one JSON object: {"atom": "<the id of the best atom, or none if no atom's job covers this>", "sure": true or false}`;
 }
 
 export async function tellDots(raw: string) {
@@ -45,7 +45,7 @@ export async function tellDots(raw: string) {
   if (NS.sample && (S.perms as any).sample !== "denied") {
     try {
       const j: any = await NS.sample.json(routePrompt(text), { modelTier: "quick" });
-      const id = String(j?.dot || ""), dd = S.dots.find(x => x.id === id);
+      const id = String(j?.atom || j?.dot || ""), dd = S.dots.find(x => x.id === id);
       if (dd) { pick = dd; sure = j?.sure !== false; } else if (id === "none") none = true;
     } catch (e) { diag("sample.route", e); }
   }
@@ -85,11 +85,11 @@ export function paintTell() {
   const note = $("#tellNote");
   if (!show) { if (note) note.innerHTML = ""; return; }
   const inp = $("#tellIn"), t = S.tell;
-  const ph = S.dots.length ? "Tell your dots something…" : "Describe a job, and a dot is made for it…";
+  const ph = S.dots.length ? "Tell your atoms something…" : "Describe a job, and an atom is made for it…";
   if (inp.placeholder !== ph) inp.placeholder = ph;
   inp.disabled = !!t?.busy; $("#tellSend").disabled = !!t?.busy;
   let html = "";
-  if (t?.busy) html = `<span class="fine">Finding the right dot…</span>`;
-  else if (t?.choices) html = `<span class="fine">${t.none ? "None of your dots does this yet." : "Which dot should take this?"}</span>${t.choices.map(id => { const d = S.dots.find(x => x.id === id); return d ? `<button type="button" class="chip" data-act="tell-pick" data-id="${esc(d.id)}">${avatarHtml(d, { size: 16 })}${esc(d.name)}</button>` : ""; }).join("")}<button type="button" class="chip" data-act="tell-new">${ICON.plus}New dot for this</button><button type="button" class="link" data-act="tell-cancel">Never mind</button>`;
+  if (t?.busy) html = `<span class="fine">Finding the right atom…</span>`;
+  else if (t?.choices) html = `<span class="fine">${t.none ? "None of your atoms does this yet." : "Which atom should take this?"}</span>${t.choices.map(id => { const d = S.dots.find(x => x.id === id); return d ? `<button type="button" class="chip" data-act="tell-pick" data-id="${esc(d.id)}">${avatarHtml(d, { size: 16 })}${esc(d.name)}</button>` : ""; }).join("")}<button type="button" class="chip" data-act="tell-new">${ICON.plus}New atom for this</button><button type="button" class="link" data-act="tell-cancel">Never mind</button>`;
   if (note.innerHTML !== html) note.innerHTML = html;
 }

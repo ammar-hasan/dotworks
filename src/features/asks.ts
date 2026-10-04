@@ -78,7 +78,7 @@ export function askHtml(a, o = {}) {
     quiet && a.draft && canExecute(a) ? `<button class="btn ghost sm" data-act="copy" data-id="${id}">Copy</button>` : "",
     a.link ? `<a class="btn ghost sm" href="${esc(a.link)}" target="_blank" rel="noopener">${ICON.out}Open</a>` : "",
   ].join("");
-  const who = (o as any).inChat ? "" : `${d ? avatarHtml(d, { size: 18 }) : ""}<span>${esc(d?.name || "A dot")}</span><span>·</span>`;
+  const who = (o as any).inChat ? "" : `${d ? avatarHtml(d, { size: 18 }) : ""}<span>${esc(d?.name || "An atom")}</span><span>·</span>`;
   return `<article class="ask" data-key="${id}" style="--h:${hueOf(d)}" data-comment-target>
     <div class="from">${who}<span class="kind">${esc(a.kind === "tool" ? shortOf(a.payload?.server) : k.label)}</span><span>· ${ago(a.createdAt)}</span>${a.source === "cloud" ? `<span class="cloud-tag">· from the cloud</span>` : ""}<button type="button" class="x" data-act="dismiss" data-id="${id}" aria-label="Not now" title="Not now">×</button></div>
     <h4>${esc(a.title)}</h4>${a.why ? `<p>${esc(a.why)}</p>` : ""}${actionPlan(a)}
@@ -96,7 +96,7 @@ export function paintAsks() {
   const fh = f.map(([k, l]) => `<button type="button" class="chip" data-act="ask-filter" data-id="${k}" aria-pressed="${S.askFilter === k}">${l}${counts[k] ? ` · ${counts[k]}` : ""}</button>`).join("");
   if ($("#asksFilter").innerHTML !== fh) $("#asksFilter").innerHTML = fh;
   const shown = p.filter(a => S.askFilter === "all" || bucketOf(a) === S.askFilter);
-  if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When a dot wants to change something, or needs your say, it asks here first.") : "Sign in to see what your dots ask you."}</p>`; if (list.innerHTML !== msg) list.innerHTML = msg; }
+  if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When an atom wants to change something, or needs your say, it asks here first.") : "Sign in to see what your atoms ask you."}</p>`; if (list.innerHTML !== msg) list.innerHTML = msg; }
   else reconcile(list, shown.map(a => ({ key: a.id, html: askHtml(a, { withDot: true }), sig: askSig(a) })));
   const handled = S.actions.filter(a => a.state !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)), hb = $("#handled");
   if (!handled.length) { hb.innerHTML = ""; return; }
@@ -132,7 +132,7 @@ export async function execute(id) {
       await NS.mcp.callTool(SRV.cal, "respond_to_event", args);
       result = { label: RSVP[a.payload.response]?.done || "Answered", url: a.link || null, receipt: receiptOf(a, args) }; NS.mcp.invalidate(SRV.cal).catch(() => {});
     } else if (a.kind === "block") {
-      const p = a.payload, base = { summary: p.title, startTime: p.start, endTime: p.end, timeZone: TZ, description: `Blocked from Dotworks. ${a.why || ""}`.slice(0, 500) };
+      const p = a.payload, base = { summary: p.title, startTime: p.start, endTime: p.end, timeZone: TZ, description: `Blocked from Atoms. ${a.why || ""}`.slice(0, 500) };
       let r; try { r = await NS.mcp.callTool(SRV.cal, "create_event", { ...base, eventType: "FOCUS_TIME" }); } catch (e) { if (e?.code !== "tool_error") throw e; r = await NS.mcp.callTool(SRV.cal, "create_event", { ...base, availability: "AVAILABILITY_BUSY" }); }
       result = { label: "Focus time added", url: r?.payload?.htmlLink || null, receipt: receiptOf(a, base), undo: inverseOf(SRV.cal, "create_event", base, r?.payload) }; NS.mcp.invalidate(SRV.cal).catch(() => {});
     } else if (a.kind === "tool") {
@@ -175,7 +175,7 @@ export async function execute(id) {
     } else result = { label: "Marked handled" };
     result = { ...result, at: Date.now(), undo: result.undo || null };
     await setActionState(id, "done", { result, ...(payloadUpdate ? { payload: payloadUpdate } : {}) });
-    delete S.edits[id]; toast(result.label, result.undo ? { label: "Undo", fn: () => undoAction(id) } : undefined);
+    delete S.edits[id]; cheer(a.dotId); toast(result.label, result.undo ? { label: "Undo", fn: () => undoAction(id) } : undefined);
   } catch (e) {
     if (e?.code !== "local") diag("ask." + a.kind, e);
     const c = e?.code, k = KINDS[a.kind] || {};
@@ -183,6 +183,9 @@ export async function execute(id) {
   }
   delete S.busy[id]; renderAll();
 }
+
+// the atom that asked does a little hop when you say yes or answer it
+export function cheer(dotId) { if (!dotId) return; S.cheer[dotId] = Date.now(); setTimeout(() => renderAll(), 1600); }
 
 // you answered a dot's question: save it, then let the dot carry on with it
 export async function answerQuestion(id: string, choiceId: string) {
@@ -193,7 +196,7 @@ export async function answerQuestion(id: string, choiceId: string) {
   const ok = await setActionState(id, "done", { answer, result: { label: "Answered", at: Date.now() } });
   delete S.busy[id];
   if (!ok) { renderAll(); return; }
-  delete S.edits[id]; renderAll();
+  delete S.edits[id]; cheer(a.dotId); renderAll();
   const d = S.dots.find(x => x.id === a.dotId);
   if (d) carryOn(d, { ...a, answer, state: "done" });
 }

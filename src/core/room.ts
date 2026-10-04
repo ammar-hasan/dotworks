@@ -7,7 +7,7 @@ import { renderAll, renderPeers } from "../ui/shell";
 export function startRoom() {
   try {
     NS.room.onPeers(ch => { S.peers = [...ch.peers]; renderPeers(); }, e => diag("room.peers", e));
-    NS.room.on("ran", msg => { if (msg.isMe) return; const n = Number((msg.data as any)?.asks) || 0; whoIs(msg.by).then(name => toast(`${name}'s dot just woke · ${plural(n, "ask")}`)); }, e => diag("room.on", e));
+    NS.room.on("ran", msg => { if (msg.isMe) return; const n = Number((msg.data as any)?.asks) || 0; whoIs(msg.by).then(name => toast(`${name}'s atom just woke · ${plural(n, "ask")}`)); }, e => diag("room.on", e));
   } catch (e) { diag("room.start", e); }
   setPresence(); refreshCanSend();
 }

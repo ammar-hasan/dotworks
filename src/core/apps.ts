@@ -1,6 +1,6 @@
 import { SRV } from "./constants";
 import { NS, S } from "./state";
-/* Your apps: every connector this copy of Dotworks was published with (see scripts/manifest.mjs), as listTools()
+/* Your apps: every connector this copy of Atoms was published with (see scripts/manifest.mjs), as listTools()
    reports them for the viewer. A dot reads with an app's read tools and may propose any of its other tools as an ask;
    nothing runs until you approve, and anything that can't be undone needs a second tap.
    KNOWN_APPS only gives familiar apps a short name, a line about what they hold and a colour; any other connector
@@ -17,7 +17,7 @@ export const KNOWN_APPS: Record<string, { short: string; does: string; hue: numb
 };
 const hueOfName = (n: string) => { let h = 7; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 export const appInfo = (n: string) => KNOWN_APPS[n] || { short: n, does: "", hue: hueOfName(n) };
-// servers that are Dotworks' own plumbing, not apps a dot reads
+// servers that are Atoms' own plumbing, not apps a dot reads
 const isPlumbing = (n: string) => n === SRV.cloud || S.conn[n]?.kind === "artifact";
 // the viewer's apps: what listTools() reported (the manifest ∩ their connected connectors)
 export const appNames = (): string[] => Object.keys(S.conn).filter(n => !isPlumbing(n)).sort((a, b) => appInfo(a).short.localeCompare(appInfo(b).short));

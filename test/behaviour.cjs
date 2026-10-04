@@ -4,7 +4,7 @@
 const { JSDOM, VirtualConsole } = require("jsdom");
 const fs = require("fs"), path = require("path");
 
-const html = fs.readFileSync(path.join(__dirname, "..", "dist", "dotworks.html"), "utf8");
+const html = fs.readFileSync(path.join(__dirname, "..", "dist", "atoms.html"), "utf8");
 const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
 const clone = o => (o === undefined ? undefined : JSON.parse(JSON.stringify(o)));
 const deepFreeze = o => { if (o && typeof o === "object" && !Object.isFrozen(o)) { Object.freeze(o); for (const v of Object.values(o)) deepFreeze(v); } return o; };
@@ -151,7 +151,7 @@ function makeRuntime(opts = {}) {
     o.onText?.({ text, delta: "x" });
     return { text, truncated: false, modelTierApplied: o.modelTier === "complex" ? "default" : (o.modelTier || "default") };
   };
-  sample.json = async (input, o) => { checkInput(input); checkOpts(o); calls.sample.push({ json: true, input }); if (typeof input === "string" && /Pick the dot whose job this message belongs to/.test(input)) { await tick(5); return clone(opts.route || { dot: "none", sure: true }); } return { name: "Agenda guard", responsibility: "Watch this week's meetings and flag any without an agenda.", rules: ["Be polite"], sources: ["calendar"], cadence: "daily", tier: "quick", hue: 40, look: { shape: "pebble", eyes: "wide", acc: "beanie" } }; };
+  sample.json = async (input, o) => { checkInput(input); checkOpts(o); calls.sample.push({ json: true, input }); if (typeof input === "string" && /Pick the atom whose job this message belongs to/.test(input)) { await tick(5); return clone(opts.route || { dot: "none", sure: true }); } return { name: "Agenda guard", responsibility: "Watch this week's meetings and flag any without an agenda.", rules: ["Be polite"], sources: ["calendar"], cadence: "daily", tier: "quick", hue: 40, look: { shape: "pebble", eyes: "wide", acc: "beanie" } }; };
   sample.limits = async () => { if (opts.limitsFail) throw { code: "capability_removed", message: "old" }; return { maxPromptBytes: 262144, ...(opts.noTools ? {} : { tools: { maxCount: 8 } }), images: { maxCount: 1, maxInputBytes: 2e7, mediaTypes: ["image/png", "image/jpeg"] } }; };
   const events = [
     { id: "e1", summary: "Dashboard review", start: { dateTime: iso(2 * 3600e3) }, end: { dateTime: iso(3 * 3600e3) }, attendees: [{ email: "me@x.com", self: true, responseStatus: "needsAction" }, { email: "o@x.com" }], htmlLink: "https://calendar.google.com/e1", organizer: { email: "o@x.com" }, eventType: "DEFAULT" },
@@ -360,7 +360,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   ok(!q(d, "#peers").hidden && /2 here now/.test(text(d, "#peers")), "presence shows 2 here now");
   ok(rt.calls.presence.length > 0 && rt.calls.presence.every(p => "view" in p), "presence published with the view");
   click(w, q(d, '#field [data-act="plant-open"]')); await tick(30);
-  ok(!q(d, "#scrim").hidden && text(d, "#sh-title") === "Plant it", "plant sheet opens");
+  ok(!q(d, "#scrim").hidden && text(d, "#sh-title") === "Add it", "add sheet opens");
   ok(!q(d, "#sh-ask"), "plant sheet has no AI box");
   ok(q(d, "#sh-name").value === "Meeting prep", "sheet prefilled from the seed");
   click(w, q(d, '#sh-look [data-look="acc"][data-v="headphones"]')); await tick(10);
@@ -532,7 +532,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   ok(lib?.templates?.[0]?.name === "Meeting prep+" && !("vips" in lib.templates[0]) && !("notesAssetId" in lib.templates[0]) && lib.templates[0].look?.shape === "blob", "shared to library/<me> with look, without people or files");
   click(w, q(d, '#nav [data-nav="seeds"]')); await tick(40);
   ok(/shared by you/.test(text(d, "#seedGrid")), "seeds show your shared seed");
-  ok(/in your field/.test(text(d, "#seedGrid")), "seeds mark what's in your field");
+  ok(/you have it/.test(text(d, "#seedGrid")), "elements mark the ones you have");
   click(w, q(d, `#dotList [data-id="${dotId}"]`)); await tick(30);
   const exportBtn = q(d, '#msgs [data-act="export"]');
   click(w, exportBtn); await tick(30);
@@ -556,7 +556,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
 
   console.log("13. New dot with Claude shaping it");
   click(w, q(d, '#homeActions [data-act="new"]')); await tick(30);
-  ok(text(d, "#sh-title") === "Make a dot" && !!q(d, "#sh-ask"), "make sheet with the AI box");
+  ok(text(d, "#sh-title") === "Make an atom" && !!q(d, "#sh-ask"), "make sheet with the AI box");
   typeIn(w, q(d, "#sh-ask"), "Warn me about meetings with no agenda");
   click(w, q(d, '#sh-draftBtn')); await tick(60);
   ok(q(d, "#sh-name").value === "Agenda guard" && !!q(d, '#sh-prev .av[data-shape="pebble"][data-acc="beanie"]'), "Claude filled the form and picked a look");
@@ -703,11 +703,11 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(/3 repos you can reach/.test(text(d9, '#appGrid [data-key="GitHub"]')) && /disrupt-gt\/course-materials/.test(text(d9, '#appGrid [data-key="GitHub"]')), "GitHub card lists your repos");
     const slackCard = d9.querySelector('#appGrid [data-key="Slack"]'), driveCard = d9.querySelector('#appGrid [data-key="Google Drive"]');
     ok(/asks first/.test(slackCard.textContent) && !!slackCard.querySelector('[data-act="allow"]') && /used by Launch watch/.test(slackCard.textContent), "Slack: asks first, Allow now, used by its dot");
-    ok(/not connected in Claude/.test(driveCard.textContent) && /used by File keeper/.test(driveCard.textContent) && /update Dotworks/.test(driveCard.textContent) && !driveCard.querySelector('[data-act="app-toggle"]'), "Drive: a dot needs it, says it isn't here and how to add it");
+    ok(/not connected in Claude/.test(driveCard.textContent) && /used by File keeper/.test(driveCard.textContent) && /update Atoms/.test(driveCard.textContent) && !driveCard.querySelector('[data-act="app-toggle"]'), "Drive: a dot needs it, says it isn't here and how to add it");
     click(w9, slackCard.querySelector('[data-act="app-tools"]')); await tick(10);
     ok(/send message ⚠/.test(text(d9, '#appGrid [data-key="Slack"]')) && /search public/.test(text(d9, '#appGrid [data-key="Slack"]')), "See tools: reads and actions, irreversible ones marked");
     click(w9, d9.querySelector('#appGrid [data-key="Gmail"] [data-act="app-toggle"]')); await tick(30);
-    ok(JSON.stringify(rt9.db.store.get(`data/users/${UID}/apps_prefs`)?.off) === '["Gmail"]' && /off for Dotworks/.test(text(d9, '#appGrid [data-key="Gmail"]')), "Turn off Gmail: saved, shown");
+    ok(JSON.stringify(rt9.db.store.get(`data/users/${UID}/apps_prefs`)?.off) === '["Gmail"]' && /off for Atoms/.test(text(d9, '#appGrid [data-key="Gmail"]')), "Turn off Gmail: saved, shown");
     click(w9, d9.querySelector('#nav [data-nav="home"]')); await tick(10);
     click(w9, d9.querySelector('#sideNew')); await tick(30);
     const srcText = text(d9, '[id$="-srcs"]');
@@ -721,7 +721,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const acts = [...rt9.db.store.entries()].filter(([k, v]) => k.startsWith(`data/users/${UID}/act_`)).map(([, v]) => v);
     const tSlack = acts.find(a => a.kind === "tool" && a.payload.tool === "slack_send_message"), tCal = acts.find(a => a.kind === "tool" && a.payload.tool === "update_event"), note = acts.find(a => a.kind === "note");
     ok(tSlack && !("bogus" in tSlack.payload.input) && tCal && tCal.context?.title === "Dashboard review", "tool asks saved; unknown args dropped; context from the event");
-    ok(note && !("whyNote" in note) && /isn't one of this dot's apps/.test(rt9.flags.r3 || ""), "a tool from another app becomes a note, and the dot is told why");
+    ok(note && !("whyNote" in note) && /isn't one of this atom's apps/.test(rt9.flags.r3 || ""), "a tool from another app becomes a note, and the dot is told why");
     click(w9, d9.querySelector('#nav [data-nav="asks"]')); await tick(40);
     ok(/Slack/.test(text(d9, "#asksFilter")) && /Calendar/.test(text(d9, "#asksFilter")), "filters by app: " + text(d9, "#asksFilter"));
     const findCard = (id) => [...d9.querySelectorAll("#asksList .ask")].find(c => c.dataset.key === id);
@@ -794,7 +794,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector('#dotList [data-id="dot_c"]')); await tick(20);
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(20);
     click(w, d.querySelector('#cloud [data-act="cloud-open"]')); await tick(20);
-    ok(d.querySelector('#cloud [data-act="cloud-create"]')?.disabled === true && /finish Dotworks setup/.test(text(d, "#cloud")), "Keep it awake waits for setup and says how to finish it");
+    ok(d.querySelector('#cloud [data-act="cloud-create"]')?.disabled === true && /finish Atoms setup/.test(text(d, "#cloud")), "Keep it awake waits for setup and says how to finish it");
     ok(!rt.calls.mcp.some(c => c.tool === "create_trigger"), "creates nothing that couldn't find its way back");
     rt.db.store.set("meta/app", { url: "https://claude.ai/artifact/TestDotworks01" }); await rt.db.api.doc("meta/app").set({ url: "https://claude.ai/artifact/TestDotworks01" }); await tick(30);
     ok(d.querySelector('#cloud [data-act="cloud-create"]')?.disabled === false, "lights up as soon as setup records the address");
@@ -875,12 +875,12 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
       rt.db.store.set(`data/users/${UID}/dot_a`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings and flag invites I haven't answered.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
       rt.db.store.set(`data/users/${UID}/dot_b`, { type: "dot", name: "Inbox triage", responsibility: "Scan unread email and sum up what needs a reply.", rules: [], sources: ["gmail"], cadence: "daily", tier: "default", hue: 28, createdAt: 2, lastRunAt: null });
     };
-    const routeCalls = rt => rt.calls.sample.filter(c => c.json && /Pick the dot whose job this message belongs to/.test(c.input));
+    const routeCalls = rt => rt.calls.sample.filter(c => c.json && /Pick the atom whose job this message belongs to/.test(c.input));
     const chatSent = (rt, msg) => rt.calls.sample.some(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === msg);
     {
       const rt = makeRuntime({ route: { dot: "dot_b", sure: true } }); two(rt);
       const { w, d, errors } = await load(rt, { wait: 300 });
-      ok(d.querySelector("#tell") && !d.querySelector("#tell").hidden && /Tell your dots/.test(d.querySelector("#tellIn").placeholder), "the box is on Home");
+      ok(d.querySelector("#tell") && !d.querySelector("#tell").hidden && /Tell your atoms/.test(d.querySelector("#tellIn").placeholder), "the box is on Home");
       typeIn(w, d.querySelector("#tellIn"), "Did Sara reply about the deck?"); submit(w, d.querySelector("#tell")); await tick(500);
       ok(routeCalls(rt).length === 1 && /dot_a: "Meeting prep"/.test(routeCalls(rt)[0].input) && /dot_b: "Inbox triage"/.test(routeCalls(rt)[0].input), "Claude picks among your dots");
       ok(text(d, "#dvName") === "Inbox triage" && chatSent(rt, "Did Sara reply about the deck?"), "lands in the right dot's chat and it replies");
@@ -892,7 +892,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
       const { w, d } = await load(rt, { wait: 300 });
       typeIn(w, d.querySelector("#tellIn"), "Keep an eye on things"); submit(w, d.querySelector("#tell")); await tick(300);
       const chips = qa(d, '#tellNote [data-act="tell-pick"]');
-      ok(/Which dot should take this\?/.test(text(d, "#tellNote")) && chips[0]?.dataset.id === "dot_a" && chips.length === 2 && !!d.querySelector('#tellNote [data-act="tell-new"]'), "not sure: asks which, its best guess first");
+      ok(/Which atom should take this\?/.test(text(d, "#tellNote")) && chips[0]?.dataset.id === "dot_a" && chips.length === 2 && !!d.querySelector('#tellNote [data-act="tell-new"]'), "not sure: asks which, its best guess first");
       click(w, chips[0]); await tick(500);
       ok(text(d, "#dvName") === "Meeting prep" && chatSent(rt, "Keep an eye on things"), "your pick gets it");
     }
@@ -900,7 +900,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
       const rt = makeRuntime({ route: { dot: "none" } }); two(rt);
       const { w, d } = await load(rt, { wait: 300 });
       typeIn(w, d.querySelector("#tellIn"), "Watch my Supabase costs"); submit(w, d.querySelector("#tell")); await tick(300);
-      ok(/None of your dots does this yet/.test(text(d, "#tellNote")), "no dot does it: says so");
+      ok(/None of your atoms does this yet/.test(text(d, "#tellNote")), "no dot does it: says so");
       click(w, d.querySelector('#tellNote [data-act="tell-new"]')); await tick(200);
       ok(!!d.querySelector("#sh-form") && d.querySelector("#sh-ask")?.value === "Watch my Supabase costs" && rt.calls.sample.some(c => c.json && /Turn this request/.test(c.input) && /Watch my Supabase costs/.test(c.input)), "offers a new dot, shaped from what you said");
     }

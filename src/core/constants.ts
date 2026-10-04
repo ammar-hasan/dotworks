@@ -15,7 +15,7 @@ export const CAPS = [
 export const CONNECTORS = [
   { server: SRV.cal, label: "Google Calendar", does: "your day, RSVPs, focus time", probe: ["list_events", () => ({ pageSize: 1, timeZone: TZ })] },
   { server: SRV.mail, label: "Gmail", does: "reading mail, drafts", probe: ["search_threads", () => ({ query: "in:inbox", pageSize: 1, view: "THREAD_VIEW_METADATA_ONLY" })] },
-  { server: SRV.cloud, label: "Scheduled tasks", does: "waking dots in the cloud", probe: ["list_triggers", () => ({ limit: 1 })] },
+  { server: SRV.cloud, label: "Scheduled tasks", does: "waking atoms in the cloud", probe: ["list_triggers", () => ({ limit: 1 })] },
 ];
 export const FIX = {
   needs_reauth: "reconnect it in Settings → Connectors",
@@ -48,6 +48,7 @@ export const ICON = {
   home: SV('<path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>'),
   inbox: SV('<path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13h4l1.5 2.5h5L16 13h4"/>'),
   plug: SV('<path d="M9 7V3M15 7V3"/><path d="M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>'),
+  atom: SV('<circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9.2" ry="3.5"/><ellipse cx="12" cy="12" rx="9.2" ry="3.5" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.2" ry="3.5" transform="rotate(120 12 12)"/>'),
   sprout: SV('<path d="M12 20v-8"/><path d="M12 12c0-4 3-6.5 7.5-6.5 0 4.2-3 6.5-7.5 6.5z"/><path d="M12 14c0-3.2-2.6-5.2-6.5-5.2 0 3.2 2.6 5.2 6.5 5.2z"/>'),
   plus: SV('<path d="M12 5v14M5 12h14"/>'),
   more: SV('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),

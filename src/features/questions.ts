@@ -37,7 +37,7 @@ export function questionPlan(a) {
   const q = questionOf(a), id = esc(a.id), busy = !!S.busy[a.id], d = S.dots.find(x => x.id === a.dotId);
   const btns = q.choices.map(c => `<button type="button" class="btn sm choice" data-act="answer" data-id="${id}" data-choice="${esc(c.id)}" ${busy ? "disabled" : ""}>${esc(c.label)}</button>`).join("");
   const own = q.allowText ? `<div class="q-own"><label class="sr" for="qa-${id}">Your answer</label><input type="text" id="qa-${id}" data-edit="answer" data-id="${id}" maxlength="300" value="${esc(S.edits[a.id]?.answer || "")}" placeholder="${q.choices.length ? "Or say it your way…" : "Your answer…"}" ${busy ? "disabled" : ""}><button type="button" class="btn sm" data-act="answer" data-id="${id}" data-choice="own" ${busy ? "disabled" : ""}>Answer</button></div>` : "";
-  return `<div class="plan q-plan">${btns ? `<div class="q-choices">${btns}</div>` : ""}${own}<p class="fine">Your answer goes back to ${esc(d?.name || "the dot")}. Nothing else happens.</p></div>`;
+  return `<div class="plan q-plan">${btns ? `<div class="q-choices">${btns}</div>` : ""}${own}<p class="fine">Your answer goes back to ${esc(d?.name || "the atom")}. Nothing else happens.</p></div>`;
 }
 
 // the answer you chose or typed, or "" (and the text box gets focus) when there's nothing to send yet

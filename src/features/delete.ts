@@ -17,7 +17,7 @@ export async function deleteDot(did) {
   try {
     if (cloudOn(d) && NS.mcp) { toast("Removing its cloud schedule first…"); try { await NS.mcp.callTool(SRV.cloud, "delete_trigger", { trigger_id: d.cloud.triggerId }); } catch (e) { if (e?.code !== "tool_error") { diag("cloud.delete", e); toast("Couldn't confirm its cloud schedule was removed, so nothing was deleted. Try again."); return; } } }
     await userDoc(did).delete();
-  } catch (e) { S.gone.delete(did); diag("db.delete", e); toast(`Couldn't delete that dot (${e?.code || "error"}).`); return; }
+  } catch (e) { S.gone.delete(did); diag("db.delete", e); toast(`Couldn't delete that atom (${e?.code || "error"}).`); return; }
   // gone from the field at once; its notes, asks and file are tidied up behind the scenes
   S.dots = S.dots.filter(x => x.id !== did); S.fresh.delete(did);
   const asks = S.actions.filter(a => a.dotId === did).map(a => a.id);

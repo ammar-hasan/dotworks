@@ -62,13 +62,13 @@ export function refreshAssets() { NS.assets.list().then(r => { S.assetsUsage = r
 
 export function subscribe() {
   if (!NS.db) { S.seedsLoaded = true; return; }
-  // where this copy of Dotworks lives (recorded once by the setup skill); cloud wakes need it to find their way back
+  // where this copy of Atoms lives (recorded once by the setup skill); cloud wakes need it to find their way back
   NS.db.doc("meta/app").onSnapshot(snap => {
     const u = snap.exists ? String(snap.data()?.url || "") : "";
     S.appUrl = /^https:\/\/claude\.ai\/(code\/)?artifact\/[A-Za-z0-9_-]{6,64}$/.test(u) ? u : "";
     S.appUrlLoaded = true; if (S.view === "dot" && S.tab === "schedule") paintCloud();
   }, e => { S.appUrlLoaded = true; diag("db.app", e); });
-  // which apps you've turned off for Dotworks (private to you)
+  // which apps you've turned off for Atoms (private to you)
   userDoc("apps_prefs").onSnapshot(snap => { const off = snap.exists ? snap.data()?.off : null; S.appsOff = new Set((Array.isArray(off) ? off : []).filter(n => typeof n === "string" && n.length <= 80)); renderAll(); }, e => diag("db.prefs", e));
   NS.db.collection("library").onSnapshot(snap => {
     const seeds = [];

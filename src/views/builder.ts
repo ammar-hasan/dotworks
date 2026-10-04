@@ -45,7 +45,7 @@ export function lookBlock(f, p) {
 }
 export function builderHtml(f, mode) {
   const p = mode === "new" ? "sh" : "st", editing = mode === "edit";
-  const title = editing ? "Settings" : S.sheet?.kind === "plant" ? "Plant it" : "Make a dot";
+  const title = editing ? "Settings" : S.sheet?.kind === "plant" ? "Add it" : "Make an atom";
   return `<form class="builder" id="${p}-form" data-draft="${mode}" novalidate>
     <div class="b-head"><h2 id="${p}-title">${title}</h2>${editing ? "" : `<button type="button" class="icon-btn" data-act="close-sheet" aria-label="Close">${ICON.close}</button>`}</div>
     ${NS.sample && !editing && S.sheet?.kind !== "plant" ? `<div class="spark"><label class="eyebrow" for="sh-ask">Say what you want watched</label><div class="row"><input type="text" id="sh-ask" data-f="ask" value="${esc(f.ask || "")}" placeholder="Warn me about this week's meetings that have no agenda" style="flex:1;min-width:200px"><button class="btn pri" type="button" data-act="draft-ai" id="sh-draftBtn">Shape it</button></div><span class="note" id="sh-draftNote">Claude fills in everything below — name, job, rules, even a look. You check it before it joins your field.</span></div>` : ""}
@@ -60,7 +60,7 @@ export function builderHtml(f, mode) {
       <div class="field-i"><label class="eyebrow" for="${p}-tier">Mind</label><select id="${p}-tier" data-f="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}" ${tierOf(f) === k ? "selected" : ""}>${v}${k === "complex" ? " · slower" : k === "quick" ? " · lightest" : ""}</option>`).join("")}</select></div></div>
     ${NS.user ? `<div class="field-i"><label class="eyebrow" for="${p}-people">People who matter · optional</label><div class="people-pick"><div class="people" id="${p}-vips"></div><input type="text" id="${p}-people" data-people="${mode}" placeholder="Search your organization" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="${p}-plist" aria-autocomplete="list"><div class="plist" id="${p}-plist" role="listbox" hidden></div></div><span class="note">Their mail comes first. Only their ids are saved.</span></div>` : ""}
     ${NS.assets ? `<div class="field-i"><label class="eyebrow" for="${p}-file">Something it should know · optional</label><input type="file" id="${p}-file" data-file="${mode}" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json"><span class="note" id="${p}-fileNote">${f.notesName ? `Knows <b>${esc(f.notesName)}</b> now. Pick another file to replace it, or <button type="button" class="link" data-act="drop-file" data-id="${mode}">remove it</button>.` : "A .txt, .md, .csv or .json it rereads every time, like your team roster."}</span></div>` : ""}
-    <div class="row b-foot"><button class="btn pri" type="submit" id="${p}-save">${editing ? "Save changes" : S.sheet?.kind === "plant" ? "Plant it" : "Add to my field"}</button>${editing ? "" : `<button type="button" class="btn ghost" data-act="close-sheet">Cancel</button>`}<span class="err" id="${p}-err" role="alert"></span></div>
+    <div class="row b-foot"><button class="btn pri" type="submit" id="${p}-save">${editing ? "Save changes" : S.sheet?.kind === "plant" ? "Add it" : "Make it"}</button>${editing ? "" : `<button type="button" class="btn ghost" data-act="close-sheet">Cancel</button>`}<span class="err" id="${p}-err" role="alert"></span></div>
   </form>`;
 }
 export function repoListHtml(f, mode) {
@@ -115,7 +115,7 @@ export async function draftWithClaude() {
   const btn = $("#sh-draftBtn"), note = $("#sh-draftNote"); btn.disabled = true; note.textContent = "Shaping…";
   try {
     const j = await NS.sample.json(
-      `Turn this request into the setup for a personal assistant "dot". A dot is a small character with one job: it reads some of the owner's apps (${appsAvail().map(shortOf).join(", ") || "none connected yet"}), writes the owner short notes, can ask the owner a question, and can propose (never take) actions in those apps for the owner to approve.\nRequest: """${ask.slice(0, 600)}"""\n` +
+      `Turn this request into the setup for a personal assistant "atom". An atom is a small character with one job: it reads some of the owner's apps (${appsAvail().map(shortOf).join(", ") || "none connected yet"}), writes the owner short notes, can ask the owner a question, and can propose (never take) actions in those apps for the owner to approve.\nRequest: """${ask.slice(0, 600)}"""\n` +
       `Reply with only one JSON object: {"name": string (2-3 words), "responsibility": string (2-3 plain sentences: what to watch and what is worth reporting), "rules": string[] (up to 3 short rules), "sources": array of app names it should read, from: ${JSON.stringify(appsAvail())}, "cadence": "hourly"|"daily"|"weekly", "tier": "quick"|"default"|"complex", "hue": integer 0-359, "look": {"shape": "orb"|"squircle"|"blob"|"pebble", "eyes": "round"|"wide"|"happy"|"sleepy", "acc": "none"|"glasses"|"shades"|"headphones"|"antenna"|"beanie"} (a look that suits its personality)}`,
       { modelTier: "quick" });
     const f = S.formDraft; if (!f) return;
@@ -123,7 +123,7 @@ export async function draftWithClaude() {
       sources: normSources((j as any)?.sources).length ? normSources((j as any).sources) : normSources(f.sources), cadence: CADENCE[(j as any)?.cadence] ? (j as any).cadence : "daily", tier: tierOf(j),
       hue: Number.isFinite(+(j as any)?.hue) ? ((Math.round(+(j as any).hue) % 360) + 360) % 360 : f.hue, look: lookOf({ id: "x", look: (j as any)?.look || f.look }), rev: (f.rev || 0) + 1 });
     renderSheet();
-    const n2 = $("#sh-draftNote"); if (n2) n2.textContent = "Here it is. Change anything — its look too — then add it to your field.";
+    const n2 = $("#sh-draftNote"); if (n2) n2.textContent = "Here it is. Change anything — its look too — then make it.";
   } catch (e) { diag("sample.shape", e); note.textContent = e?.code === "not_granted" ? "Claude isn't allowed on this page. Fill it in by hand." : e?.code === "rate_limited" ? "Usage limit reached. Fill it in by hand or try later." : "Couldn't shape that. Try saying it another way."; }
   finally { const b = $("#sh-draftBtn"); if (b) b.disabled = false; }
 }
@@ -133,7 +133,7 @@ export async function saveBuilder(mode) {
   const rules = clean(f.rulesText || "").split("\n").map(s => s.trim()).filter(Boolean).slice(0, 6), sources = normSources(f.sources);
   if (!name || !resp) { err.textContent = "Give it a name and a job."; return; }
   if (!sources.length) { err.textContent = "Let it read at least one app."; return; }
-  if (!NS.db || !S.uid) { err.textContent = "Open this page inside Claude, signed in, to save dots."; return; }
+  if (!NS.db || !S.uid) { err.textContent = "Open this page inside Claude, signed in, to save atoms."; return; }
   const btn = $(`#${p}-save`); btn.disabled = true; err.textContent = "";
   const prev = mode === "edit" ? S.dots.find(d => d.id === f.id) : null, id = prev ? prev.id : newId("dot_");
   if (f.repoMode === "some" && !(f.repoList || []).length) { err.textContent = "Pick at least one repo, or choose None."; return; }
@@ -152,12 +152,12 @@ export async function saveBuilder(mode) {
     if (oldAsset && oldAsset !== (fields as any).notesAssetId) NS.assets?.delete(oldAsset).catch(() => {});
     if (f.seedKey) recordAdopt(f.seedKey);
     if (fileChanged) refreshAssets();
-    if (mode === "new") { closeSheet(); openDot(id, "chat"); toast(`${name} is in your field`, { label: "Wake it", fn: () => runDot(id) }); }
+    if (mode === "new") { closeSheet(); openDot(id, "chat"); toast(`${name} is ready`, { label: "Wake it", fn: () => runDot(id) }); }
     else { S.editDraft = null; S.editFile = null; S.settingsKey = ""; toast("Saved"); renderAll(); }
   } catch (e) {
     diag("db.save", e);
     const c = e?.code;
-    err.textContent = c === "quota_exceeded" || c === "quota_or_state" ? "Storage is full. Delete an old dot or file first." : c === "unsupported_type" || c === "invalid_request" ? "That file couldn't be stored. Save it as UTF-8 text and try again." : c === "too_large" ? "That file is too large." : `Couldn't save (${c || "error"}). Details are in Signals & access.`;
+    err.textContent = c === "quota_exceeded" || c === "quota_or_state" ? "Storage is full. Delete an old atom or file first." : c === "unsupported_type" || c === "invalid_request" ? "That file couldn't be stored. Save it as UTF-8 text and try again." : c === "too_large" ? "That file is too large." : `Couldn't save (${c || "error"}). Details are in Signals & access.`;
     btn.disabled = false;
   }
 }

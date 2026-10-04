@@ -1,5 +1,5 @@
 // Builds Dotworks into the one self-contained page a Claude artifact needs:
-// dist/dotworks.html = page head bits + inlined CSS + markup + one classic <script>.
+// dist/atoms.html = page head bits + inlined CSS + markup + one classic <script>.
 // The artifact publisher wraps it in its own document skeleton, so this is a fragment, not a full document.
 // It also writes the documents setup puts in the artifact's store (dist/data/): the cloud wake runbook (meta/runbook)
 // and the starter seeds (library/starter), from config/.
@@ -44,14 +44,14 @@ async function build() {
   const body = fs.readFileSync(path.join(root, "src/page/body.html"), "utf8").trim();
   const script = js.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
   const page = `${head}\n<style>\n${css.outputFiles[0].text.trim()}\n</style>\n\n${body}\n\n<script>\n${script.trim()}\n</script>\n`;
-  fs.writeFileSync(path.join(dist, "dotworks.html"), page);
+  fs.writeFileSync(path.join(dist, "atoms.html"), page);
   if (args.has("--preview")) {
     const mock = fs.readFileSync(path.join(root, "test/mock-browser.js"), "utf8");
     fs.writeFileSync(path.join(dist, "preview.html"), `<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>\n<script>window.__scene = new URLSearchParams(location.search).get("scene") || "full";</script>\n<script>\n${mock}\n</script>\n${page}</body></html>\n`);
   }
   const runbookV = writeData();
   const kb = (Buffer.byteLength(page) / 1024).toFixed(0);
-  console.log(`built dist/dotworks.html · ${kb} KB · v${pkg.version} · runbook v${runbookV}${args.has("--preview") ? " · dist/preview.html" : ""}`);
+  console.log(`built dist/atoms.html · ${kb} KB · v${pkg.version} · runbook v${runbookV}${args.has("--preview") ? " · dist/preview.html" : ""}`);
 }
 
 if (args.has("--watch")) {
