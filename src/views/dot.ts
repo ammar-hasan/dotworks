@@ -4,6 +4,7 @@ import { ICON, TIERS } from "../core/constants";
 import { $, ago, dayLabel, esc, fmtTime, fmtWhen, handleOf, headlineOf, hueOf, md, plural, reconcile } from "../core/helpers";
 import { NS, S, cloudOn, curDot, isNarrow, pending, sendOK } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
+import { receiptHtml } from "../features/receipts";
 import { appsMissingFor, cloudFiringFor, paintCloud } from "../features/cloud";
 import { avatarHtml, lookOf, stateOf } from "../ui/characters";
 import { dotStatus } from "../ui/shell";
@@ -76,7 +77,7 @@ export function paintChat() {
       ...myActs.filter(a => a.runId === r.id).map(a => ({ at: a.createdAt || 0, kind: "ask", a })),
     ].sort((x, y) => x.at - y.at);
     for (const it of items) {
-      if (it.kind === "turn") blocks.push(turnBlock(it.t, `t:${r.id}:${it.i}`, d));
+      if (it.kind === "turn") { if (it.t.kind !== "answer") blocks.push(turnBlock(it.t, `t:${r.id}:${it.i}`, d)); }
       else { shown.add(it.a.id); blocks.push(askBlock(it.a)); }
     }
   }
@@ -105,8 +106,13 @@ export function turnBlock(t, key, d) {
 export function askBlock(a) {
   if (a.state === "pending") return { key: "ask:" + a.id, sig: askSig(a), html: `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body">${askHtml(a, { inChat: true })}</div></div>` };
   const ok = a.state === "done" || a.state === "handed_off";
+  // an answered question reads as the question and your answer; the dot's reply follows in the thread
+  if (a.kind === "question" && a.state === "done" && a.answer?.text) {
+    const html = `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body"><div class="done-line q-done"><span class="tick">?</span><span>${esc(a.title)}</span><b class="q-ans">${esc(a.answer.text)}</b></div></div></div>`;
+    return { key: "ask:" + a.id, sig: html, html };
+  }
   const label = a.result?.label || (a.state === "handed_off" ? "Handed to Claude" : a.state === "dismissed" ? "Not now" : "Done");
-  const html = `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body"><div class="done-line"><span class="tick">${ok ? "✓" : "–"}</span><span>${esc(label)} · ${esc(a.title)}</span>${a.result?.url ? `<a href="${esc(a.result.url)}" target="_blank" rel="noopener">open</a>` : a.state === "dismissed" ? `<button class="mini" data-act="undismiss" data-id="${esc(a.id)}">bring back</button>` : ""}</div></div></div>`;
+  const html = `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body"><div class="done-line${a.result?.undone ? " undone-row" : ""}"><span class="tick">${ok ? "✓" : "–"}</span><span class="dl-t"><span class="dl-l">${esc(label)} · ${esc(a.title)}</span>${receiptHtml(a)}</span>${a.result?.url ? `<a href="${esc(a.result.url)}" target="_blank" rel="noopener">open</a>` : a.state === "dismissed" ? `<button class="mini" data-act="undismiss" data-id="${esc(a.id)}">bring back</button>` : ""}</div></div></div>`;
   return { key: "ask:" + a.id, sig: html, html };
 }
 export function paintComposer() {

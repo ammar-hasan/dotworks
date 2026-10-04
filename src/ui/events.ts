@@ -7,7 +7,8 @@ import { diag } from "../core/diag";
 import { $, autosize, clean, cssKey, fitBytes, fmtTime, fmtWhen, handleOf, slug, toast } from "../core/helpers";
 import { refreshCanSend } from "../core/room";
 import { NS, S, curDot, userDoc } from "../core/state";
-import { execute, setActionState } from "../features/asks";
+import { answerQuestion, execute, setActionState, undoAction } from "../features/asks";
+import { deliver, newDotFrom, paintTell, tellDots } from "../features/tell";
 import { cloudAct, cloudCreate, cloudFind, cloudPlan, loadTriggers, paintCloud } from "../features/cloud";
 import { deleteDot } from "../features/delete";
 import { allow, closeAcct, renderAcct } from "./account";
@@ -61,6 +62,11 @@ document.addEventListener("click", ev => {
     case "chat-stop": S.chat?.ctl.abort(); break;
     case "drop-img": S.replyImage = null; paintComposer(); break;
     case "exec": execute(id); break;
+    case "answer": answerQuestion(id, b.dataset.choice); break;
+    case "undo": undoAction(id); break;
+    case "tell-pick": { const t = S.tell, dd = S.dots.find(x => x.id === id); S.tell = null; paintTell(); if (t && dd) deliver(dd, t.text); break; }
+    case "tell-new": { const t = S.tell; S.tell = null; paintTell(); if (t) newDotFrom(t.text); break; }
+    case "tell-cancel": { const t = S.tell; S.tell = null; paintTell(); const inp = $("#tellIn"); if (inp && t) { inp.value = t.text; inp.focus(); } break; }
     case "edit-ask": { const a = S.actions.find(x => x.id === id); if (!a) break; if (S.edits[id]) delete S.edits[id]; else S.edits[id] = { to: (a.payload?.to || []).join(", "), subject: a.payload?.subject || "", body: a.payload?.body || "" }; renderAll(); if (S.edits[id]) $(`#ed-body-${cssKey(id)}`)?.focus(); break; }
     case "dismiss": setActionState(id, "dismissed").then(ok => ok && toast("Moved out of the way", { label: "Undo", fn: () => setActionState(id, "pending") })); break;
     case "undismiss": setActionState(id, "pending"); break;
@@ -149,11 +155,13 @@ document.addEventListener("submit", ev => {
   ev.preventDefault();
   if ((ev.target as any).classList.contains("builder")) saveBuilder((ev.target as any).dataset.draft);
   if ((ev.target as any).id === "composer") sendReply();
+  if ((ev.target as any).id === "tell") { const inp = $("#tellIn"), v = inp?.value || ""; if (v.trim()) { inp.value = ""; tellDots(v); } }
 });
 document.addEventListener("paste", ev => { if ((ev.target as any).id !== "reply" || !S.imagesOK) return; const f = [...(ev.clipboardData?.files || [])].find(x => x.type.startsWith("image/")); if (f) { S.replyImage = f; paintComposer(); } });
 document.addEventListener("keydown", ev => {
   const t = ev.target, typing = (t as any).closest?.("input,textarea,select,[contenteditable]");
   if ((t as any).id === "sh-ask" && ev.key === "Enter") { ev.preventDefault(); draftWithClaude(); return; }
+  if ((t as any).dataset?.edit === "answer" && ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); answerQuestion((t as any).dataset.id, "own"); return; }
   if ((t as any).id === "reply" && ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); sendReply(); return; }
   if (ev.key === "Escape") {
     if ((t as any).dataset?.people) { const l = $(`#${prefixOf((t as any).dataset.people)}-plist`); if (l) l.hidden = true; return; }

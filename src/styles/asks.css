@@ -16,3 +16,16 @@
 .ask input[type=text],.ask textarea{font-size:13.5px;padding:7px 9px;border-radius:9px;background:var(--panel)}
 .ask textarea{min-height:110px;font:400 14.5px/1.5 var(--f-letter)}
 .calm{font:italic 400 17px/1.5 var(--f-letter);color:var(--muted)}
+
+/* questions: tap an answer, or say it your way */
+.q-plan{gap:10px}
+.q-choices{display:flex;flex-wrap:wrap;gap:6px}
+.btn.choice{border-radius:99px;background:var(--panel);border:1px solid var(--line-2);font-weight:500}
+.btn.choice:hover:not(:disabled){border-color:hsl(var(--h) 70% 56%);background:hsl(var(--h) 85% 60% / .12)}
+.q-own{display:flex;gap:6px}
+.q-own input{flex:1;min-width:0;height:32px;border:1px solid var(--line-2);border-radius:99px;padding:0 13px;background:var(--panel);font:400 13.5px var(--f-ui);color:var(--ink)}
+.q-own input:focus{outline:none;border-color:var(--accent)}
+/* receipts: what an approved ask changed, and a way back */
+.rc{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font:400 11.5px/1.4 var(--f-mono);color:var(--muted)}
+.rc-t{overflow-wrap:anywhere}
+.undone{font:500 11px var(--f-mono);color:var(--warn)}

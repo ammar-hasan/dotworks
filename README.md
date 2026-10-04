@@ -31,7 +31,9 @@ To pick up new code or an app you've just connected, say **"update Dotworks"** i
 - **Dots, notes, asks** live in the artifact's store under your private path (`data/users/<you>`).
 - **In the app**, a dot wakes with Claude and the read tools of the apps it's allowed to use.
 - **In the cloud**, each dot gets its own routine. It follows the runbook in [`config/runbook.md`](config/runbook.md) and can also read GitHub repos you tie to the dot.
-- **Asks** are tool calls in waiting: the card is built from the tool's own schema, you can edit every argument, and only *Approve* runs it.
+- **Asks** are tool calls in waiting: the card is built from the tool's own schema, you can edit every argument, and only *Approve* runs it. Afterwards a receipt says what changed, with an Undo where there's an exact way back.
+- **Questions**: when the right move depends on something only you know, a dot asks with a few answers to tap, and carries on as soon as you answer.
+- **One box on Home**: type what you want and it goes to the dot whose job fits, or offers to make one.
 
 ### Platform limits worth knowing
 

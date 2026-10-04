@@ -115,7 +115,7 @@ export async function draftWithClaude() {
   const btn = $("#sh-draftBtn"), note = $("#sh-draftNote"); btn.disabled = true; note.textContent = "Shaping…";
   try {
     const j = await NS.sample.json(
-      `Turn this request into the setup for a personal assistant "dot". A dot is a small character that can read the owner's Google Calendar and Gmail, writes the owner short notes, and can propose (never take) actions: Gmail reply drafts, RSVPs, and focus-time blocks.\nRequest: """${ask.slice(0, 600)}"""\n` +
+      `Turn this request into the setup for a personal assistant "dot". A dot is a small character with one job: it reads some of the owner's apps (${appsAvail().map(shortOf).join(", ") || "none connected yet"}), writes the owner short notes, can ask the owner a question, and can propose (never take) actions in those apps for the owner to approve.\nRequest: """${ask.slice(0, 600)}"""\n` +
       `Reply with only one JSON object: {"name": string (2-3 words), "responsibility": string (2-3 plain sentences: what to watch and what is worth reporting), "rules": string[] (up to 3 short rules), "sources": array of app names it should read, from: ${JSON.stringify(appsAvail())}, "cadence": "hourly"|"daily"|"weekly", "tier": "quick"|"default"|"complex", "hue": integer 0-359, "look": {"shape": "orb"|"squircle"|"blob"|"pebble", "eyes": "round"|"wide"|"happy"|"sleepy", "acc": "none"|"glasses"|"shades"|"headphones"|"antenna"|"beanie"} (a look that suits its personality)}`,
       { modelTier: "quick" });
     const f = S.formDraft; if (!f) return;

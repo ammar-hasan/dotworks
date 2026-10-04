@@ -57,7 +57,7 @@ export function buildView() {
     v.innerHTML = `<section class="page"><header class="page-h"><span class="eyebrow">Seeds</span><h1 class="title">Plant a dot</h1><p class="sub">Starter dots, plus the ones people here have shared. Planting copies the setup into your field — your notes always stay private.</p></header><div class="page-body"><div class="seedgrid" id="seedGrid"></div></div></section>`;
   } else {
     v.innerHTML = `<section class="home">
-      <header class="home-h"><div class="eyebrow" id="clock">&nbsp;</div><h1 class="greet" id="greet">Dotworks</h1><p class="voice" id="voice"></p><div class="home-actions" id="homeActions"></div><div class="banner" id="banner" role="status"></div></header>
+      <header class="home-h"><div class="eyebrow" id="clock">&nbsp;</div><h1 class="greet" id="greet">Dotworks</h1><p class="voice" id="voice"></p><div class="home-actions" id="homeActions"></div><form class="tell" id="tell" autocomplete="off" hidden><label class="sr" for="tellIn">Tell your dots</label><input type="text" id="tellIn" maxlength="2000" enterkeyhint="send"><button class="send" type="submit" id="tellSend" aria-label="Send">${ICON.send}</button></form><div class="tell-note" id="tellNote" role="status"></div><div class="banner" id="banner" role="status"></div></header>
       <div class="field" id="field" data-uncommentable></div>
       <div class="home-foot" id="homeFoot"><div class="horizon" id="horizon"></div><aside class="peek" id="peek" aria-label="Next ask"></aside></div>
     </section>`;

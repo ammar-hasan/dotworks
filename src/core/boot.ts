@@ -36,7 +36,7 @@ export async function boot(hot) {
   renderAll();
   const later = {
     permissions: async () => { await readPerms(); startDay(); },
-    sample: async () => { try { const l = await NS.sample.limits(); S.toolsOK = !!l?.tools; S.imagesOK = l?.images || null; } catch (e) { S.toolsOK = null; diag("sample.limits", e); } },
+    sample: async () => { try { const l = await NS.sample.limits(); S.toolsOK = !!l?.tools; S.toolMax = Number(l?.tools?.maxCount) || 0; S.imagesOK = l?.images || null; } catch (e) { S.toolsOK = null; diag("sample.limits", e); } },
     mcp: async () => { refreshConnectors(); startDay(); },
     room: async () => startRoom(),
     assets: async () => refreshAssets(),

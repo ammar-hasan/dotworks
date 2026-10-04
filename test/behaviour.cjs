@@ -119,7 +119,12 @@ function makeRuntime(opts = {}) {
     const by = Object.fromEntries(tools.map(t => [t.name, t]));
     const ctx = { signal: o.signal || new AbortController().signal };
     const isWake = typeof input === "string" && /waking for a check-in/.test(input);
-    if (isWake && tools.length && by.slack_slack_search_public) {
+    if (isWake) flags.lastWake = input;
+    if (isWake && tools.length && opts.ask) {
+      flags.askTools = tools.map(t => t.name);
+      flags.q1 = await by.ask_owner.execute({ question: "Which reviews should I chase?", choices: ["Pending only", "All open", "pending ONLY"], allowText: true, why: "You have 6 open pull requests" }, ctx);
+      try { await by.ask_owner.execute({ question: "And another?", choices: ["a", "b"] }, ctx); flags.secondAsk = "allowed"; } catch (e) { flags.secondAsk = e.message; }
+    } else if (isWake && tools.length && by.slack_slack_search_public) {
       flags.slackDesc = by.propose_action.description; flags.slackTools = tools.map(t => t.name);
       if (by.calendar_events) await by.calendar_events.execute({ days: 2 }, ctx);
       await by.slack_slack_search_public.execute({ query: "launch" }, ctx);
@@ -133,24 +138,27 @@ function makeRuntime(opts = {}) {
       await by.propose_action.execute({ kind: "rsvp", title: "Broken rsvp", why: "no event id", response: "accepted" }, ctx);
       await by.propose_action.execute({ kind: "block", title: "Focus: Q4 plan", why: "Tomorrow is packed", start: iso(864e5), end: iso(864e5 + 5400e3) }, ctx);
       try { await by.propose_action.execute({ kind: "note", title: "Fourth", why: "over the limit" }, ctx); flags.limited = false; } catch { flags.limited = true; }
+    } else if (!isWake && Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "")) {
+      flags.carried = (flags.carried || 0) + 1; flags.carriedWith = input[input.length - 1].content;
     } else if (!isWake && Array.isArray(input) && tools.length && by.propose_action) {
       await by.propose_action.execute({ kind: "rsvp", title: "Accept Dashboard review", why: "Unanswered", eventId: "e1", response: "accepted" }, ctx);
     }
     if (ctx.signal.aborted) throw { code: "cancelled", message: "stopped" };
     const text = isWake ? "## Two things need you today\n- Sara asked about the deck — draft ready\n- Dashboard review at 17:00 — you haven't replied\n- Read https://example.com/x for context"
+      : Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "") ? "On it. I'll chase the pending ones first."
       : Array.isArray(input) ? "Sure — I'd keep the reply short. I queued the RSVP too." : "Things look calm.";
     for (let i = 8; i < text.length; i += 24) { if (ctx.signal.aborted) throw { code: "cancelled", message: "stopped", text: text.slice(0, i) }; o.onText?.({ text: text.slice(0, i), delta: "x" }); await tick(4); }
     o.onText?.({ text, delta: "x" });
     return { text, truncated: false, modelTierApplied: o.modelTier === "complex" ? "default" : (o.modelTier || "default") };
   };
-  sample.json = async (input, o) => { checkInput(input); checkOpts(o); calls.sample.push({ json: true, input }); return { name: "Agenda guard", responsibility: "Watch this week's meetings and flag any without an agenda.", rules: ["Be polite"], sources: ["calendar"], cadence: "daily", tier: "quick", hue: 40, look: { shape: "pebble", eyes: "wide", acc: "beanie" } }; };
+  sample.json = async (input, o) => { checkInput(input); checkOpts(o); calls.sample.push({ json: true, input }); if (typeof input === "string" && /Pick the dot whose job this message belongs to/.test(input)) { await tick(5); return clone(opts.route || { dot: "none", sure: true }); } return { name: "Agenda guard", responsibility: "Watch this week's meetings and flag any without an agenda.", rules: ["Be polite"], sources: ["calendar"], cadence: "daily", tier: "quick", hue: 40, look: { shape: "pebble", eyes: "wide", acc: "beanie" } }; };
   sample.limits = async () => { if (opts.limitsFail) throw { code: "capability_removed", message: "old" }; return { maxPromptBytes: 262144, ...(opts.noTools ? {} : { tools: { maxCount: 8 } }), images: { maxCount: 1, maxInputBytes: 2e7, mediaTypes: ["image/png", "image/jpeg"] } }; };
   const events = [
     { id: "e1", summary: "Dashboard review", start: { dateTime: iso(2 * 3600e3) }, end: { dateTime: iso(3 * 3600e3) }, attendees: [{ email: "me@x.com", self: true, responseStatus: "needsAction" }, { email: "o@x.com" }], htmlLink: "https://calendar.google.com/e1", organizer: { email: "o@x.com" }, eventType: "DEFAULT" },
     { id: "e2", summary: "Standup", start: { dateTime: iso(-0.5 * 3600e3) }, end: { dateTime: iso(0.25 * 3600e3) }, attendees: [{ email: "me@x.com", self: true, responseStatus: "accepted" }], htmlLink: "https://calendar.google.com/e2" },
   ];
   const mcp = {
-    async listTools() { return { servers: [...(opts.noCal ? [] : [{ server: "Google Calendar", authStatus: "connected", tools: [{ name: "list_events", annotations: { readOnlyHint: true } }, { name: "update_event" }, { name: "delete_event", annotations: { destructiveHint: true } }] }]), { server: "Gmail", authStatus: "unknown", tools: [{ name: "search_threads" }, { name: "create_draft" }] }, { server: "Claude Code Remote", authStatus: "connected", tools: [{ name: "list_triggers" }] },
+    async listTools() { return { servers: [...(opts.noCal ? [] : [{ server: "Google Calendar", authStatus: "connected", tools: [{ name: "list_events", annotations: { readOnlyHint: true } }, { name: "update_event" }, { name: "delete_event", annotations: { destructiveHint: true } }, ...(opts.undo ? [{ name: "get_event", annotations: { readOnlyHint: true } }, { name: "create_event" }] : [])] }]), { server: "Gmail", authStatus: "unknown", tools: [{ name: "search_threads" }, { name: "create_draft" }, ...(opts.undo ? [{ name: "delete_draft" }] : [])] }, { server: "Claude Code Remote", authStatus: "connected", tools: [{ name: "list_triggers" }] },
       ...(opts.slack ? [{ server: "Slack", authStatus: "connected", tools: [{ name: "slack_search_public", annotations: { readOnlyHint: true } }, { name: "slack_send_message" }, { name: "slack_send_message_draft" }] }] : []),
       ...(opts.linear ? [{ server: "Linear", authStatus: "connected", tools: [{ name: "list_issues", annotations: { readOnlyHint: true } }, { name: "create_issue" }, { name: "delete_issue" }] }] : [])] }; },
     async describeTool(server, tool) {
@@ -174,7 +182,10 @@ function makeRuntime(opts = {}) {
         case "get_thread": return { payload: { id: "t1", messageCount: 2, viewUrl: "https://mail.google.com/t1", messages: [{ id: "m1", sender: "sara@x.com", toRecipients: ["me@x.com"], date: "2026-10-04", subject: "Deck", plaintextBody: "Hi,\nAny thoughts? https://tracker.example.com/abc?x=1\n\nOn Mon, Oct 3, 2026 Sara wrote:\n> old text" }] } };
         case "create_draft": return { payload: { id: "d1", threadId: "t1", viewUrl: "https://mail.google.com/draft/d1" } };
         case "respond_to_event": return { payload: {} };
-        case "create_event": if (input.eventType === "FOCUS_TIME") throw { code: "tool_error", message: "Focus time is not supported" }; return { payload: { htmlLink: "https://calendar.google.com/new" } };
+        case "create_event": if (input.eventType === "FOCUS_TIME") throw { code: "tool_error", message: "Focus time is not supported" }; return { payload: { id: "ev_new", htmlLink: "https://calendar.google.com/new" } };
+        case "get_event": return { payload: { id: input.eventId, summary: input.eventId === "e1" ? "Dashboard review" : "Standup", description: input.eventId === "e1" ? "Old notes" : "", htmlLink: "https://calendar.google.com/" + input.eventId, organizer: { self: true } } };
+        case "delete_draft": if (opts.draftGone) throw { code: "tool_error", message: "Draft not found" }; return { payload: {} };
+        case "delete_event": return { payload: {} };
         case "list_environments": return { payload: { data: [{ id: "ccpool_x1", name: "Laptop pool", kind: "self_hosted" }, { id: "env_abc123", name: "Default", kind: "anthropic_cloud" }] } };
         case "create_trigger": {
           if (opts.createFail) throw { code: "tool_error", message: "environment_id is required" };
@@ -379,7 +390,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   ok(run.status === "done" && run.text.startsWith("## Two things"), "run saved done" + (run.status !== "done" ? " — " + JSON.stringify({ s: run.status, e: run.errorCode }) : ""));
   ok(run.steps.length >= 6 && run.steps.every(s => s.state === "ok"), "steps recorded ok (" + run.steps.length + ")");
   const wakeCall = rt.calls.sample.find(c => typeof c.input === "string" && /waking for a check-in/.test(c.input));
-  ok(wakeCall && wakeCall.o.tools?.join(",") === "calendar_events,gmail_search,gmail_read_thread,propose_action" && !("cache" in wakeCall.o), "wake offers 4 tools, no cache option");
+  ok(wakeCall && wakeCall.o.tools?.join(",") === "calendar_events,gmail_search,gmail_read_thread,propose_action,ask_owner" && !("cache" in wakeCall.o), "wake offers its tools, propose and ask, no cache option: " + wakeCall?.o.tools?.join(","));
   ok(/You can reach: Google Calendar and Gmail/.test(wakeCall?.input || ""), "prompt says what it can reach");
   const acts = actsIn(rt);
   ok(acts.length === 3 && rt.flags.limited === true, "3 asks queued, a 4th refused");
@@ -416,8 +427,8 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   ok(!card(broken.id), "dismissed card leaves at once");
   await tick(30);
   ok(rt.db.store.get(`data/users/${UID}/${broken.id}`).state === "dismissed", "Not now dismisses");
-  const undo = qa(d, ".toast button").find(b => b.textContent === "Undo");
-  ok(!!undo, "dismiss offers Undo");
+  const undo = qa(d, ".toast").filter(t => /Moved out of the way/.test(t.textContent)).pop()?.querySelector("button");
+  ok(!!undo && undo.textContent === "Undo", "dismiss offers Undo");
   click(w, undo); await tick(40);
   ok(rt.db.store.get(`data/users/${UID}/${broken.id}`).state === "pending", "Undo brings it back");
   click(w, card(broken.id).querySelector('[data-act="dismiss"]')); await tick(40);
@@ -801,6 +812,158 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const srcText = text(d, '[id$="-srcs"]');
     ok(/Gmail/.test(srcText) && /Slack/.test(srcText) && !/Calendar/.test(srcText), "new dot offers their apps: " + srcText);
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("25. Questions: a dot asks, you answer, it carries on");
+  {
+    const rt = makeRuntime({ ask: true });
+    rt.db.store.set(`data/users/${UID}/dot_q`, { type: "dot", name: "PR chaser", responsibility: "Chase my pull request reviews.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 20, createdAt: 1, lastRunAt: null });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_q"]')); await tick(30);
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(500);
+    ok(rt.flags.askTools?.includes("ask_owner") && /If the right move depends on something only the owner knows, call ask_owner/.test(rt.flags.lastWake || ""), "a wake can ask, and is told when to");
+    const qs = actsIn(rt).filter(a => a.kind === "question");
+    ok(qs.length === 1 && qs[0].title === "Which reviews should I chase?" && qs[0].question.choices.map(c => c.label).join("|") === "Pending only|All open" && qs[0].question.allowText === true, "question saved: duplicate choices merged, own words allowed");
+    ok(/already asked a question/.test(rt.flags.secondAsk || ""), "one question per wake");
+    const qid = qs[0].id;
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    const card = [...d.querySelectorAll("#asksList .ask")].find(c => c.dataset.key === qid);
+    ok(card && card.querySelectorAll(".choice").length === 2 && !!card.querySelector('[data-edit="answer"]') && !card.querySelector('[data-act="handoff"]') && /Question/.test(card.textContent), "card: two answers to tap, a box for your own words, nothing to hand off");
+    ok(/Questions · 1/.test(text(d, "#asksFilter")), "filter chip for questions");
+    click(w, card.querySelector('[data-act="answer"][data-choice="c1"]')); await tick(400);
+    const answered = rt.db.store.get(`data/users/${UID}/${qid}`);
+    ok(answered?.state === "done" && answered.answer?.text === "Pending only" && answered.answer.choice === "c1", "your answer is saved");
+    ok(rt.flags.carried === 1 && /My answer to your question “Which reviews should I chase\?”: Pending only/.test(rt.flags.carriedWith || ""), "the dot carries on with your answer right away");
+    const runKey = [...rt.db.store.keys()].find(k => k.startsWith(`data/users/${UID}/dot_q/runs/`));
+    const th = rt.db.store.get(runKey)?.thread || [];
+    ok(th.some(t => t.kind === "answer" && t.actId === qid) && th.some(t => t.role === "dot" && /chase the pending ones/.test(t.text)), "answer and reply kept on the note's thread");
+    ok(!!rt.db.store.get(`data/users/${UID}/${qid}`)?.continuedAt, "marked as acted on");
+    click(w, d.querySelector('#dotList [data-id="dot_q"]')); await tick(60);
+    ok(/Which reviews should I chase\?/.test(text(d, "#msgs .q-done")) && /Pending only/.test(text(d, "#msgs .q-done .q-ans")) && !qa(d, "#msgs .msg.you .bubble").some(b => /My answer to your question/.test(b.textContent)), "chat shows the question and your answer, not the plumbing");
+    ok(/chase the pending ones/.test(text(d, "#msgs")), "and the dot's reply");
+    // a question written by a cloud wake, answered in your own words
+    rt.db.store.set(`data/users/${UID}/act_cq`, { type: "action", source: "cloud", dotId: "dot_q", runId: "run_cloud1", state: "pending", createdAt: Date.now(), kind: "question", title: "Which repo matters most this week?", why: "Two are busy", question: { choices: [{ id: "a", label: "course-materials" }, { id: "a", label: "ridge" }, { label: "" }], allowText: false } });
+    await rt.db.api.doc(`data/users/${UID}/act_cq`).update({ why: "Two are busy" }); await tick(40);
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    const cq = [...d.querySelectorAll("#asksList .ask")].find(c => c.dataset.key === "act_cq");
+    ok(cq && cq.querySelectorAll(".choice").length === 2 && new Set([...cq.querySelectorAll(".choice")].map(b => b.dataset.choice)).size === 2 && !cq.querySelector('[data-edit="answer"]'), "cloud question: odd choices cleaned, ids kept unique");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  {
+    const rt = makeRuntime({ ask: true });
+    rt.db.store.set(`data/users/${UID}/dot_q`, { type: "dot", name: "PR chaser", responsibility: "Chase my pull request reviews.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 20, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/act_free`, { type: "action", source: "page", dotId: "dot_q", runId: "run_x", state: "pending", createdAt: Date.now(), kind: "question", title: "What should I call the weekly digest?", question: { choices: [], allowText: false } });
+    rt.db.store.set(`data/users/${UID}/act_old`, { type: "action", source: "page", dotId: "dot_q", runId: "run_y", state: "done", decidedAt: Date.now(), createdAt: Date.now() - 864e5, kind: "question", title: "Should I include drafts?", question: { choices: [{ id: "c1", label: "Yes" }, { id: "c2", label: "No" }] }, answer: { choice: "c2", text: "No", at: Date.now() - 3600e3 } });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    const fc = [...d.querySelectorAll("#asksList .ask")].find(c => c.dataset.key === "act_free");
+    ok(fc && !fc.querySelector(".choice") && !!fc.querySelector('[data-edit="answer"]'), "no real choices: answer in your own words");
+    const inp = fc.querySelector('[data-edit="answer"]'); typeIn(w, inp, "  The Monday brief ");
+    inp.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await tick(300);
+    const fa = rt.db.store.get(`data/users/${UID}/act_free`);
+    ok(fa?.state === "done" && fa.answer?.text === "The Monday brief" && fa.answer.choice === null, "Enter sends your own words");
+    ok(!rt.flags.carried && /use your answer when it next wakes/.test(text(d, ".toast:last-child") + [...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "no note to continue from: it waits for the next wake, and says so");
+    click(w, d.querySelector('#dotList [data-id="dot_q"]')); await tick(30);
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(500);
+    ok(/The owner answered your questions:/.test(rt.flags.lastWake || "") && /“Should I include drafts\?” → No/.test(rt.flags.lastWake) && /“What should I call the weekly digest\?” → The Monday brief/.test(rt.flags.lastWake), "the next wake gets every answer it hasn't acted on");
+    await tick(50);
+    ok(!!rt.db.store.get(`data/users/${UID}/act_old`)?.continuedAt && !!rt.db.store.get(`data/users/${UID}/act_free`)?.continuedAt, "and marks them acted on");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("26. One box on Home: it finds the right dot");
+  {
+    const two = rt => {
+      rt.db.store.set(`data/users/${UID}/dot_a`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings and flag invites I haven't answered.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+      rt.db.store.set(`data/users/${UID}/dot_b`, { type: "dot", name: "Inbox triage", responsibility: "Scan unread email and sum up what needs a reply.", rules: [], sources: ["gmail"], cadence: "daily", tier: "default", hue: 28, createdAt: 2, lastRunAt: null });
+    };
+    const routeCalls = rt => rt.calls.sample.filter(c => c.json && /Pick the dot whose job this message belongs to/.test(c.input));
+    const chatSent = (rt, msg) => rt.calls.sample.some(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === msg);
+    {
+      const rt = makeRuntime({ route: { dot: "dot_b", sure: true } }); two(rt);
+      const { w, d, errors } = await load(rt, { wait: 300 });
+      ok(d.querySelector("#tell") && !d.querySelector("#tell").hidden && /Tell your dots/.test(d.querySelector("#tellIn").placeholder), "the box is on Home");
+      typeIn(w, d.querySelector("#tellIn"), "Did Sara reply about the deck?"); submit(w, d.querySelector("#tell")); await tick(500);
+      ok(routeCalls(rt).length === 1 && /dot_a: "Meeting prep"/.test(routeCalls(rt)[0].input) && /dot_b: "Inbox triage"/.test(routeCalls(rt)[0].input), "Claude picks among your dots");
+      ok(text(d, "#dvName") === "Inbox triage" && chatSent(rt, "Did Sara reply about the deck?"), "lands in the right dot's chat and it replies");
+      ok(d.querySelector("#tellIn") === null || d.querySelector("#tellIn").value === "", "box cleared");
+      ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+    }
+    {
+      const rt = makeRuntime({ route: { dot: "dot_a", sure: false } }); two(rt);
+      const { w, d } = await load(rt, { wait: 300 });
+      typeIn(w, d.querySelector("#tellIn"), "Keep an eye on things"); submit(w, d.querySelector("#tell")); await tick(300);
+      const chips = qa(d, '#tellNote [data-act="tell-pick"]');
+      ok(/Which dot should take this\?/.test(text(d, "#tellNote")) && chips[0]?.dataset.id === "dot_a" && chips.length === 2 && !!d.querySelector('#tellNote [data-act="tell-new"]'), "not sure: asks which, its best guess first");
+      click(w, chips[0]); await tick(500);
+      ok(text(d, "#dvName") === "Meeting prep" && chatSent(rt, "Keep an eye on things"), "your pick gets it");
+    }
+    {
+      const rt = makeRuntime({ route: { dot: "none" } }); two(rt);
+      const { w, d } = await load(rt, { wait: 300 });
+      typeIn(w, d.querySelector("#tellIn"), "Watch my Supabase costs"); submit(w, d.querySelector("#tell")); await tick(300);
+      ok(/None of your dots does this yet/.test(text(d, "#tellNote")), "no dot does it: says so");
+      click(w, d.querySelector('#tellNote [data-act="tell-new"]')); await tick(200);
+      ok(!!d.querySelector("#sh-form") && d.querySelector("#sh-ask")?.value === "Watch my Supabase costs" && rt.calls.sample.some(c => c.json && /Turn this request/.test(c.input) && /Watch my Supabase costs/.test(c.input)), "offers a new dot, shaped from what you said");
+    }
+    {
+      const rt = makeRuntime();
+      rt.db.store.set(`data/users/${UID}/dot_a`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+      const { w, d } = await load(rt, { wait: 300 });
+      typeIn(w, d.querySelector("#tellIn"), "What's first tomorrow?"); submit(w, d.querySelector("#tell")); await tick(500);
+      ok(routeCalls(rt).length === 0 && text(d, "#dvName") === "Meeting prep" && chatSent(rt, "What's first tomorrow?"), "one dot: straight to it, no routing call");
+    }
+    {
+      const rt = makeRuntime({ perms: { sample: "denied" } }); two(rt);
+      const { d } = await load(rt, { wait: 300 });
+      ok(d.querySelector("#tell")?.hidden === true, "no Claude here: no box");
+    }
+  }
+  console.log("27. Receipts and undo");
+  {
+    const rt = makeRuntime({ undo: true, perms: { "mcp:Gmail": "granted" } });
+    rt.db.store.set(`data/users/${UID}/dot_c`, { type: "dot", name: "Gamma", responsibility: "C", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 90, createdAt: 1, lastRunAt: null });
+    const now = Date.now();
+    rt.db.store.set(`data/users/${UID}/act_r`, { type: "action", source: "page", dotId: "dot_c", state: "pending", createdAt: now - 5000, kind: "reply", title: "Reply to Sara", why: "x", payload: { to: ["sara@x.com"], subject: "Re: deck", body: "Looks good", replyToMessageId: "m1" } });
+    rt.db.store.set(`data/users/${UID}/act_u`, { type: "action", source: "page", dotId: "dot_c", state: "pending", createdAt: now - 4000, kind: "tool", title: "Add agenda", why: "x", verb: "Add agenda", payload: { server: "Google Calendar", tool: "update_event", input: { eventId: "e1", description: "Old notes\n\nAgenda: 1. Status", notificationLevel: "NONE" } } });
+    rt.db.store.set(`data/users/${UID}/act_u2`, { type: "action", source: "page", dotId: "dot_c", state: "pending", createdAt: now - 3000, kind: "tool", title: "Add agenda to Standup", why: "x", verb: "Add agenda", payload: { server: "Google Calendar", tool: "update_event", input: { eventId: "e2", description: "Agenda: blockers" } } });
+    rt.db.store.set(`data/users/${UID}/act_b`, { type: "action", source: "page", dotId: "dot_c", state: "pending", createdAt: now - 2000, kind: "block", title: "Focus", why: "x", payload: { title: "Focus: Q4 plan", start: new Date(now + 864e5).toISOString(), end: new Date(now + 864e5 + 3600e3).toISOString() } });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    const cardOf = id => [...d.querySelectorAll("#asksList .ask")].find(c => c.dataset.key === id);
+    click(w, cardOf("act_r").querySelector('[data-act="exec"]')); await tick(80);
+    const r = rt.db.store.get(`data/users/${UID}/act_r`)?.result;
+    ok(r?.receipt?.app === "Gmail draft" && r.receipt.lines[0] === "To sara@x.com" && /Re: deck/.test(r.receipt.lines[1]) && r.undo?.tool === "delete_draft" && r.undo.input.draftId === "d1", "a draft's receipt, and how to take it back");
+    const tb = [...d.querySelectorAll(".toast")].pop();
+    ok(/Draft saved in Gmail/.test(tb?.textContent || "") && /Undo/.test(tb?.querySelector("button")?.textContent || ""), "the toast offers Undo");
+    click(w, tb.querySelector("button")); await tick(80);
+    ok(rt.calls.mcp.some(c => c.tool === "delete_draft" && c.input.draftId === "d1") && !!rt.db.store.get(`data/users/${UID}/act_r`)?.result?.undone, "Undo deletes exactly that draft");
+    const before = rt.calls.mcp.length;
+    click(w, cardOf("act_u").querySelector('[data-act="exec"]')); await tick(80);
+    const gi = rt.calls.mcp.slice(before).map(c => c.tool).join(",");
+    const u = rt.db.store.get(`data/users/${UID}/act_u`)?.result;
+    ok(gi === "get_event,update_event" && u?.undo?.input?.description === "Old notes" && u.undo.input.notificationLevel === "NONE" && u.undo.input.eventId === "e1", "an update reads the old text first, so it can be put back");
+    click(w, cardOf("act_u2").querySelector('[data-act="exec"]')); await tick(80);
+    ok(rt.db.store.get(`data/users/${UID}/act_u2`)?.result?.undo === null, "no old text to restore: no undo offered");
+    click(w, cardOf("act_b").querySelector('[data-act="exec"]')); await tick(80);
+    const b = rt.db.store.get(`data/users/${UID}/act_b`)?.result;
+    ok(b?.undo?.tool === "delete_event" && b.undo.input.eventId === "ev_new" && b.undo.input.notificationLevel === "NONE", "a focus block can be removed again");
+    d.querySelector("#handled details").open = true;
+    const rows = qa(d, "#handled .done-row");
+    ok(rows.length === 4 && /Gmail draft · To sara@x.com/.test(rows.map(x => x.textContent).join(" ")) && /undone/.test(rows.map(x => x.textContent).join(" ")) && rows.filter(x => x.querySelector('[data-act="undo"]')).length === 2, "handled list: receipts, Undo where it applies, and what was undone");
+    click(w, rows.find(x => x.querySelector('[data-act="undo"]') && /Focus/.test(x.textContent)).querySelector('[data-act="undo"]')); await tick(80);
+    ok(rt.calls.mcp.some(c => c.tool === "delete_event" && c.input.eventId === "ev_new"), "Undo from the list works too");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  {
+    const rt = makeRuntime({ undo: true, draftGone: true, perms: { "mcp:Gmail": "granted" } });
+    rt.db.store.set(`data/users/${UID}/act_old`, { type: "action", source: "page", dotId: "dot_c", state: "done", createdAt: Date.now() - 3 * 864e5, decidedAt: Date.now() - 2 * 864e5, kind: "reply", title: "Old reply", result: { label: "Draft saved in Gmail", receipt: { app: "Gmail draft", lines: ["To a@x.com"] }, undo: { server: "Gmail", tool: "delete_draft", input: { draftId: "d0" }, label: "Delete the draft" } } });
+    rt.db.store.set(`data/users/${UID}/act_new`, { type: "action", source: "page", dotId: "dot_c", state: "done", createdAt: Date.now() - 600e3, decidedAt: Date.now() - 500e3, kind: "reply", title: "New reply", result: { label: "Draft saved in Gmail", receipt: { app: "Gmail draft", lines: ["To b@x.com"] }, undo: { server: "Gmail", tool: "delete_draft", input: { draftId: "d9" }, label: "Delete the draft" } } });
+    const { w, d } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    d.querySelector("#handled details").open = true;
+    const rows = qa(d, "#handled .done-row");
+    ok(!rows.find(x => /Old reply/.test(x.textContent)).querySelector('[data-act="undo"]'), "after a day, no Undo");
+    click(w, rows.find(x => /New reply/.test(x.textContent)).querySelector('[data-act="undo"]')); await tick(80);
+    ok(/Couldn't undo it: Draft not found/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")) && !rt.db.store.get(`data/users/${UID}/act_new`)?.result?.undone, "if it changed since, it says so and changes nothing");
   }
   console.log("20. Claude declined for this page");
   {

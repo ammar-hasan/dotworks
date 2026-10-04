@@ -3,6 +3,7 @@ import { $, clamp, cssKey, fmtTime, plural, reconcile, span } from "../core/help
 import { NS, S, cloudOn, dueDots, pending } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
 import { recheckApps } from "../features/cloud";
+import { paintTell } from "../features/tell";
 import { avatarHtml, stateOf } from "../ui/characters";
 import { dotStatus } from "../ui/shell";
 import { nextEvent, renderHorizon } from "./horizon";
@@ -42,7 +43,7 @@ export function paintHome() {
   if (S.uid && NS.sample && !S.running && due && S.dots.length) acts += `<button class="btn" data-act="run-due">${ICON.bolt}Wake ${due} due</button>`;
   if (S.uid && NS.db) acts += `<button class="btn pri" data-act="new">${ICON.plus}New dot</button>`;
   const A = $("#homeActions"); if (A.innerHTML !== acts) A.innerHTML = acts;
-  renderField(); renderHorizon(); paintPeek(); initSky();
+  paintTell(); renderField(); renderHorizon(); paintPeek(); initSky();
 }
 export function paintPeek() {
   const box = $("#peek"); if (!box) return;

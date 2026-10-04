@@ -1,16 +1,17 @@
 import { appUsable, humanTool, kindOf, shortOf, toolsOf } from "../core/apps";
-import { emailsOf } from "../ai/flow";
+import { carryOn, emailsOf } from "../ai/flow";
+import { answerText, questionOf, questionPlan } from "./questions";
+import { canUndo, inverseOf, receiptHtml, receiptOf, snapshotForUndo, undoAction } from "./receipts";
 import { loadSchema, schemaOf } from "../ai/schemas";
 import { FIX, ICON, KINDS, RSVP, SRV, TZ } from "../core/constants";
 import { diag } from "../core/diag";
-import { $, ago, clean, clone, esc, fmtTime, fmtWhen, hueOf, plural, reconcile, toast, upsertLocal } from "../core/helpers";
+import { $, ago, clean, clone, esc, fmtTime, fmtWhen, hueOf, humanKey, isIdKey, plural, reconcile, toast, upsertLocal } from "../core/helpers";
+export { humanKey, isIdKey };
 import { NS, S, pending, sendOK, userDoc } from "../core/state";
 import { avatarHtml, lookOf } from "../ui/characters";
 import { renderAll } from "../ui/shell";
 
 /* ─── asks ─── */
-export const isIdKey = k => /(^id$|Id$|_id$|^calendarId$)/.test(k);
-export const humanKey = k => String(k).replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, c => c.toUpperCase());
 export function toolFields(a) {
   const p = a.payload || {}, inp = p.input || {}, sch = schemaOf(p.server, p.tool)?.inputSchema, props = sch?.properties || {}, ed = S.edits[a.id] || {}, id = esc(a.id);
   if (!schemaOf(p.server, p.tool) && NS.mcp) loadSchema(p.server, p.tool).then(v => { if (v) renderAll(); });
@@ -44,6 +45,7 @@ export function actionPlan(a) {
     const notify = ed?.notify ?? false;
     return `<div class="plan"><div class="plan-ev"><b>${esc(p.eventTitle || "Your meeting")}</b><span>${p.when ? esc(fmtWhen(Date.parse(p.when))) : ""}</span></div><label class="sr" for="ed-ag-${id}">Agenda</label><textarea id="ed-ag-${id}" data-edit="agenda" data-id="${id}">${esc(ed?.agenda ?? p.agenda ?? a.draft ?? "")}</textarea><label class="check"><input type="checkbox" data-edit="notify" data-id="${id}" ${notify ? "checked" : ""}> Email the guests about the change</label><p class="fine">Adds this to the meeting's description, below anything already there. Nothing else about the meeting changes.</p></div>`;
   }
+  if (a.kind === "question") return questionPlan(a);
   return a.draft ? `<div class="plan"><div class="draft">${esc(a.draft)}</div><p class="fine">A note for you. Marking it handled doesn't send or change anything${a.draft ? "; copy the text if you need it" : ""}.</p></div>` : "";
 }
 export function canExecute(a) {
@@ -54,11 +56,12 @@ export function canExecute(a) {
   return true;
 }
 export function askHtml(a, o = {}) {
-  if ((a.kind === "agenda" || a.kind === "tool") && !S.edits[a.id]) S.edits[a.id] = {};
+  if ((a.kind === "agenda" || a.kind === "tool" || a.kind === "question") && !S.edits[a.id]) S.edits[a.id] = {};
   const d = S.dots.find(x => x.id === a.dotId), busy = !!S.busy[a.id], err = S.errs[a.id], k = KINDS[a.kind] || KINDS.note, id = esc(a.id);
   const quiet = a.kind === "note" || a.kind === "followup";
   let primary;
-  if (!canExecute(a)) primary = a.draft || a.payload?.body ? `<button class="btn pri sm" data-act="copy" data-id="${id}">Copy</button>` : "";
+  if (a.kind === "question") primary = "";
+  else if (!canExecute(a)) primary = a.draft || a.payload?.body ? `<button class="btn pri sm" data-act="copy" data-id="${id}">Copy</button>` : "";
   else if (a.kind === "tool") {
     const verb = esc(a.verb || humanTool(a.payload.tool).replace(/^./, c => c.toUpperCase()));
     primary = kindOf(a.payload.server, a.payload.tool) !== "risky" ? `<button class="btn pri sm" data-act="exec" data-id="${id}" ${busy ? "disabled" : ""}>${busy ? "Working…" : verb}</button>`
@@ -70,7 +73,7 @@ export function askHtml(a, o = {}) {
   else primary = `<button class="btn pri sm" data-act="exec" data-id="${id}" ${busy ? "disabled" : ""}>${busy ? "Working…" : esc(k.verb || "Done")}</button>`;
   const secondary = [
     a.kind === "reply" && canExecute(a) ? `<button class="btn ghost sm" data-act="edit-ask" data-id="${id}">${S.edits[a.id] ? "Done editing" : "Edit"}</button>` : "",
-    !quiet && sendOK("send") ? `<button class="btn ghost sm" data-act="handoff" data-id="${id}">Hand to Claude</button>` : "",
+    !quiet && a.kind !== "question" && sendOK("send") ? `<button class="btn ghost sm" data-act="handoff" data-id="${id}">Hand to Claude</button>` : "",
     quiet && sendOK("send") ? `<button class="btn ghost sm" data-act="exec" data-id="${id}">Done</button>` : "",
     quiet && a.draft && canExecute(a) ? `<button class="btn ghost sm" data-act="copy" data-id="${id}">Copy</button>` : "",
     a.link ? `<a class="btn ghost sm" href="${esc(a.link)}" target="_blank" rel="noopener">${ICON.out}Open</a>` : "",
@@ -79,28 +82,29 @@ export function askHtml(a, o = {}) {
   return `<article class="ask" data-key="${id}" style="--h:${hueOf(d)}" data-comment-target>
     <div class="from">${who}<span class="kind">${esc(a.kind === "tool" ? shortOf(a.payload?.server) : k.label)}</span><span>· ${ago(a.createdAt)}</span>${a.source === "cloud" ? `<span class="cloud-tag">· from the cloud</span>` : ""}<button type="button" class="x" data-act="dismiss" data-id="${id}" aria-label="Not now" title="Not now">×</button></div>
     <h4>${esc(a.title)}</h4>${a.why ? `<p>${esc(a.why)}</p>` : ""}${actionPlan(a)}
-    <div class="row">${primary}${secondary}</div>${err ? `<p class="err">${esc(err.msg)}</p>` : ""}</article>`;
+    ${primary || secondary ? `<div class="row">${primary}${secondary}</div>` : ""}${err ? `<p class="err">${esc(err.msg)}</p>` : ""}</article>`;
 }
 export function askSig(a) { const d = S.dots.find(x => x.id === a.dotId); return JSON.stringify([a, !!S.edits[a.id], !!S.armed[a.id], a.kind === "tool" ? !!schemaOf(a.payload?.server, a.payload?.tool) : 0, S.connLoaded, !!S.busy[a.id], S.errs[a.id]?.msg || "", sendOK("send"), !!NS.mcp, d?.name, hueOf(d), d && lookOf(d), Math.floor((Date.now() - (a.createdAt || 0)) / 60000)]); }
 export function paintAsks() {
   const list = $("#asksList"); if (!list) return;
   const p = pending(), counts = { all: p.length };
-  const bucketOf = a => a.kind === "tool" ? a.payload?.server : a.kind === "reply" ? "Gmail" : ["rsvp", "block", "agenda"].includes(a.kind) ? "Google Calendar" : "note";
+  const bucketOf = a => a.kind === "question" ? "question" : a.kind === "tool" ? a.payload?.server : a.kind === "reply" ? "Gmail" : ["rsvp", "block", "agenda"].includes(a.kind) ? "Google Calendar" : "note";
   for (const a of p) counts[bucketOf(a)] = (counts[bucketOf(a)] || 0) + 1;
   $("#asksTitle").textContent = p.length ? `${plural(p.length, "ask")} waiting` : "All clear";
-  const f = [["all", "All"], ...Object.keys(counts).filter(k => k !== "all" && k !== "note").map(k => [k, shortOf(k)]), ...((counts as any).note ? [["note", "Notes"]] : [])];
+  const f = [["all", "All"], ...((counts as any).question ? [["question", "Questions"]] : []), ...Object.keys(counts).filter(k => !["all", "note", "question"].includes(k)).map(k => [k, shortOf(k)]), ...((counts as any).note ? [["note", "Notes"]] : [])];
   if (S.askFilter !== "all" && !counts[S.askFilter]) S.askFilter = "all";
   const fh = f.map(([k, l]) => `<button type="button" class="chip" data-act="ask-filter" data-id="${k}" aria-pressed="${S.askFilter === k}">${l}${counts[k] ? ` · ${counts[k]}` : ""}</button>`).join("");
   if ($("#asksFilter").innerHTML !== fh) $("#asksFilter").innerHTML = fh;
   const shown = p.filter(a => S.askFilter === "all" || bucketOf(a) === S.askFilter);
-  if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When a dot wants to reply, answer an invite or block time, it asks here first.") : "Sign in to see what your dots ask you."}</p>`; if (list.innerHTML !== msg) list.innerHTML = msg; }
+  if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When a dot wants to change something, or needs your say, it asks here first.") : "Sign in to see what your dots ask you."}</p>`; if (list.innerHTML !== msg) list.innerHTML = msg; }
   else reconcile(list, shown.map(a => ({ key: a.id, html: askHtml(a, { withDot: true }), sig: askSig(a) })));
   const handled = S.actions.filter(a => a.state !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)), hb = $("#handled");
   if (!handled.length) { hb.innerHTML = ""; return; }
   const wasOpen = !!hb.querySelector("details[open]");
   hb.innerHTML = `<details class="handled" ${wasOpen ? "open" : ""}><summary>Handled lately · ${handled.length}</summary><div style="margin-top:8px;max-width:680px">${handled.slice(0, 10).map(a => {
     const ok = a.state === "done" || a.state === "handed_off", label = a.result?.label || (a.state === "handed_off" ? "Handed to Claude" : a.state === "dismissed" ? "Not now" : "Done");
-    return `<div class="done-row"><span class="tick ${ok ? "" : "no"}">${ok ? "✓" : "–"}</span><span title="${esc(a.title)}">${esc(label)} · ${esc(a.title)}</span>${a.result?.url ? `<a href="${esc(a.result.url)}" target="_blank" rel="noopener">open</a>` : a.state === "dismissed" ? `<button class="mini" data-act="undismiss" data-id="${esc(a.id)}">bring back</button>` : "<span></span>"}</div>`;
+    const line = a.kind === "question" && a.answer?.text ? `${a.title} → ${a.answer.text}` : `${label} · ${a.title}`;
+    return `<div class="done-row${a.result?.undone ? " undone-row" : ""}"><span class="tick ${ok ? "" : "no"}">${ok ? "✓" : "–"}</span><span class="dr-t"><span class="dr-l" title="${esc(a.title)}">${esc(line)}</span>${receiptHtml(a)}</span>${a.result?.url ? `<a href="${esc(a.result.url)}" target="_blank" rel="noopener">open</a>` : a.state === "dismissed" ? `<button class="mini" data-act="undismiss" data-id="${esc(a.id)}">bring back</button>` : "<span></span>"}</div>`;
   }).join("")}<div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="clear-done">Clear handled</button></div></div></details>`;
 }
 export async function setActionState(id, state, extra?) {
@@ -122,15 +126,15 @@ export async function execute(id) {
       if (!p.to.length || !p.body) throw { code: "local", message: "Add a recipient and a message first." };
       const args = { to: p.to, subject: p.subject || "", body: p.body }; if ((p.cc || []).length) (args as any).cc = p.cc; if (p.replyToMessageId) (args as any).replyToMessageId = p.replyToMessageId;
       const r = await NS.mcp.callTool(SRV.mail, "create_draft", args);
-      result = { label: "Draft saved in Gmail", url: (r?.payload as any)?.viewUrl || null }; if (ed) payloadUpdate = p;
+      result = { label: "Draft saved in Gmail", url: (r?.payload as any)?.viewUrl || null, receipt: receiptOf(a, args), undo: inverseOf(SRV.mail, "create_draft", args, r?.payload) }; if (ed) payloadUpdate = p;
     } else if (a.kind === "rsvp") {
       const args = { eventId: a.payload.eventId, responseStatus: a.payload.response }; if (a.payload.comment) (args as any).responseComment = a.payload.comment;
       await NS.mcp.callTool(SRV.cal, "respond_to_event", args);
-      result = { label: RSVP[a.payload.response]?.done || "Answered", url: a.link || null }; NS.mcp.invalidate(SRV.cal).catch(() => {});
+      result = { label: RSVP[a.payload.response]?.done || "Answered", url: a.link || null, receipt: receiptOf(a, args) }; NS.mcp.invalidate(SRV.cal).catch(() => {});
     } else if (a.kind === "block") {
       const p = a.payload, base = { summary: p.title, startTime: p.start, endTime: p.end, timeZone: TZ, description: `Blocked from Dotworks. ${a.why || ""}`.slice(0, 500) };
       let r; try { r = await NS.mcp.callTool(SRV.cal, "create_event", { ...base, eventType: "FOCUS_TIME" }); } catch (e) { if (e?.code !== "tool_error") throw e; r = await NS.mcp.callTool(SRV.cal, "create_event", { ...base, availability: "AVAILABILITY_BUSY" }); }
-      result = { label: "Focus time added", url: r?.payload?.htmlLink || null }; NS.mcp.invalidate(SRV.cal).catch(() => {});
+      result = { label: "Focus time added", url: r?.payload?.htmlLink || null, receipt: receiptOf(a, base), undo: inverseOf(SRV.cal, "create_event", base, r?.payload) }; NS.mcp.invalidate(SRV.cal).catch(() => {});
     } else if (a.kind === "tool") {
       const p = a.payload, input = clone(p.input || {});
       if (!canExecute(a)) throw { code: "local", message: `${shortOf(p.server)} isn't available here. Check it in Apps.` };
@@ -143,9 +147,11 @@ export async function execute(id) {
         else if (typeof o === "boolean") input[k] = !!v;
         else if (typeof o === "string") input[k] = clean(String(v));
       }
+      // for a text-only Calendar update, read the event first so the old text can be put back
+      const before = await snapshotForUndo(p.server, p.tool, input);
       const r = await NS.mcp.callTool(p.server, p.tool, input), pl = r?.payload && typeof r.payload === "object" ? r.payload : {};
       const url = [(pl as any).htmlLink, (pl as any).viewUrl, (pl as any).webViewLink, (pl as any).url, (pl as any).permalink, (pl as any).link].find(u => typeof u === "string" && /^https:\/\//.test(u)) || a.link || null;
-      result = { label: `${a.verb || humanTool(p.tool)} · done`, url }; payloadUpdate = { ...p, input };
+      result = { label: `${a.verb || humanTool(p.tool)} · done`, url, receipt: receiptOf(a, input), undo: before || inverseOf(p.server, p.tool, input, pl) }; payloadUpdate = { ...p, input };
       delete S.armed[id]; NS.mcp.invalidate(p.server).catch(() => {});
     } else if (a.kind === "agenda") {
       const agenda = clean(ed?.agenda ?? a.payload.agenda ?? a.draft).trim().slice(0, 4000);
@@ -161,12 +167,15 @@ export async function execute(id) {
         const block = html ? esc(agenda).replace(/\n/g, "<br>") : agenda;
         const description = cur.trim() ? cur + (html ? "<br><br>" : "\n\n") + block : block;
         await NS.mcp.callTool(SRV.cal, "update_event", { eventId: a.payload.eventId, description, notificationLevel: ed?.notify ? "ALL" : "NONE" });
-        result = { label: ed?.notify ? "Agenda added; guests emailed" : "Agenda added to the invite", url: (ev as any).htmlLink || a.link || null };
+        // the old description can be put back only if there was one (an empty value may not clear the field)
+        const undo = cur.trim() && toolsOf(SRV.cal).includes("update_event") ? { server: SRV.cal, tool: "update_event", input: { eventId: a.payload.eventId, description: cur, notificationLevel: "NONE" }, label: "Take the agenda out" } : null;
+        result = { label: ed?.notify ? "Agenda added; guests emailed" : "Agenda added to the invite", url: (ev as any).htmlLink || a.link || null, receipt: receiptOf(a, {}), undo };
       }
       payloadUpdate = { ...a.payload, agenda }; NS.mcp.invalidate(SRV.cal).catch(() => {});
     } else result = { label: "Marked handled" };
+    result = { ...result, at: Date.now(), undo: result.undo || null };
     await setActionState(id, "done", { result, ...(payloadUpdate ? { payload: payloadUpdate } : {}) });
-    delete S.edits[id]; toast(result.label);
+    delete S.edits[id]; toast(result.label, result.undo ? { label: "Undo", fn: () => undoAction(id) } : undefined);
   } catch (e) {
     if (e?.code !== "local") diag("ask." + a.kind, e);
     const c = e?.code, k = KINDS[a.kind] || {};
@@ -174,3 +183,18 @@ export async function execute(id) {
   }
   delete S.busy[id]; renderAll();
 }
+
+// you answered a dot's question: save it, then let the dot carry on with it
+export async function answerQuestion(id: string, choiceId: string) {
+  const a = S.actions.find(x => x.id === id); if (!a || a.kind !== "question" || a.state !== "pending" || S.busy[id]) return;
+  const text = answerText(a, choiceId); if (!text) return;
+  S.busy[id] = true; renderAll();
+  const answer = { choice: choiceId === "own" ? null : choiceId, text, at: Date.now() };
+  const ok = await setActionState(id, "done", { answer, result: { label: "Answered", at: Date.now() } });
+  delete S.busy[id];
+  if (!ok) { renderAll(); return; }
+  delete S.edits[id]; renderAll();
+  const d = S.dots.find(x => x.id === a.dotId);
+  if (d) carryOn(d, { ...a, answer, state: "done" });
+}
+export { canUndo, questionOf, undoAction };

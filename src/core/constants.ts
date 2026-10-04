@@ -33,6 +33,7 @@ export const KINDS = {
   block: { label: "Focus time", verb: "Block it", check: "Check your calendar" },
   agenda: { label: "Agenda", verb: "Add to invite", check: "Check the invite in Calendar" },
   tool: { label: "Action", verb: "Approve", check: "Check it in the app" },
+  question: { label: "Question", verb: "Answer" },
   followup: { label: "Follow up", verb: "Mark handled" },
   note: { label: "Note", verb: "Mark handled" },
 };

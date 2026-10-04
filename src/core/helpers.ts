@@ -78,3 +78,6 @@ export function fitBytes(obj, max = 3600) {
 }
 // keep a local copy in step with a write we just made, so the screen never waits on the next snapshot
 export function upsertLocal(list, id, fields) { const i = list.findIndex(x => x.id === id); if (i >= 0) list[i] = { ...list[i], ...clone(fields) }; else list.push({ id, ...clone(fields) }); }
+// tool argument names, for people: ids are shown as codes, other keys as words
+export const isIdKey = k => /(^id$|Id$|_id$|^calendarId$)/.test(k);
+export const humanKey = k => String(k).replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, c => c.toUpperCase());

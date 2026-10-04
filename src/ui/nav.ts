@@ -1,4 +1,5 @@
 import { pruneRuns } from "../ai/flow";
+import { flushPendingSend } from "../features/tell";
 import { SRV } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, clone } from "../core/helpers";
@@ -32,6 +33,7 @@ export function openDot(id, tab?) {
         const local = S.runs.filter(r => !fresh.some(f => f.id === r.id) && Date.now() - (r.finishedAt || 0) < 15000);
         S.runs = [...local, ...fresh].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0)).slice(0, 10);
         S.runsLoaded = true; if (S.view === "dot") paintDot();
+        if (S.pendingSend?.dotId === mine) queueMicrotask(flushPendingSend);
       }, e => { S.runsLoaded = true; diag("db.runs", e); paintDot(); });
       if (!S.pruned.has(id)) { S.pruned.add(id); setTimeout(() => pruneRuns(id), 5000); }
     }
