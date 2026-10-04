@@ -1,0 +1,92 @@
+{
+  "$comment": "What every copy of Dotworks declares. scripts/manifest.mjs adds the owner's own connectors to this and writes dist/capabilities.json.",
+  "capabilities": {
+    "user": {
+      "scopes": [
+        "profile"
+      ]
+    },
+    "db": {
+      "rules": [
+        {
+          "path": "library",
+          "read": "view",
+          "write": "owner"
+        },
+        {
+          "path": "library/{self}",
+          "write": "interact"
+        },
+        {
+          "path": "adopts",
+          "read": "view",
+          "write": "owner"
+        },
+        {
+          "path": "adopts/{self}",
+          "write": "interact"
+        },
+        {
+          "path": "meta",
+          "read": "view",
+          "write": "owner"
+        }
+      ]
+    },
+    "sample": {},
+    "room": {
+      "topics": {
+        "ran": "interact"
+      }
+    },
+    "downloads": true,
+    "assets": {},
+    "comments": {
+      "composer_only": true
+    }
+  },
+  "cloud": {
+    "server": "Claude Code Remote",
+    "toolPrefix": "mcp__claude-code-remote__",
+    "tools": [
+      "list_environments",
+      "create_trigger",
+      "list_triggers",
+      "fire_trigger",
+      "update_trigger",
+      "delete_trigger",
+      "list_repos"
+    ]
+  },
+  "maxToolsPerServer": 128,
+  "skipServers": [
+    "Claude Code Remote",
+    "claude-code-remote",
+    "claude-in-chrome",
+    "remote-devices",
+    "visualize",
+    "widgets",
+    "claude_ai",
+    "Claude_Docs",
+    "Claude Docs"
+  ],
+  "trimFirst": {
+    "$comment": "When a connector offers more tools than a page may declare, these go first; then other non-essential ones (see scripts/manifest.mjs).",
+    "ElevenLabs": [
+      "agents_add_triage_ticket_turn_comment",
+      "agents_get_triage_ticket_assignable_users",
+      "agents_compile_procedures",
+      "agents_get_kb_rag_indexes",
+      "agents_compute_kb_rag_index",
+      "agents_list_secrets",
+      "agents_get_tool_dependents",
+      "agents_get_kb_dependents"
+    ]
+  },
+  "excludeTools": {
+    "$comment": "Never declared: helpers that only make sense inside a chat.",
+    "ElevenLabs": [
+      "get_more_tools"
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+/* ───── dot view ───── */
+.dotv{flex:1;min-height:0;display:flex;flex-direction:column}
+.dotv > *{flex:none}
+.dotv > .panels{flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr)}
+.dotv .banner{margin:0 28px 10px}
+.home-h .banner{margin:6px 0 0}
+.dv-h{display:flex;align-items:center;gap:14px;padding:20px 28px 12px;min-width:0}
+.dv-h .back{display:none}
+.dv-id{min-width:0;flex:1}
+.dv-id h2{font:700 22px/1.15 var(--f-ui);letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-meta{display:flex;flex-wrap:wrap;gap:2px 12px;font:400 12px/1.5 var(--f-mono);color:var(--muted);margin-top:3px}
+.dv-meta .cl{color:var(--cloud)} .dv-meta .live{color:var(--accent)} .dv-meta .warn{color:var(--warn)}
+.dv-act{display:flex;gap:6px;align-items:center}
+.menu{position:relative}
+.menu summary{list-style:none}
+.menu summary::-webkit-details-marker{display:none}
+.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:200px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column}
+.menu-list button{background:none;border:0;text-align:left;padding:9px 10px;border-radius:9px;cursor:pointer;font-size:14px;color:var(--ink)}
+.menu-list button:hover{background:var(--hover)}
+.menu-list .danger{color:var(--bad)}
+.confirm{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 28px 10px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:10px 14px;font-size:14px}
+.confirm:empty{display:none}
+.tabs{display:flex;gap:4px;padding:0 24px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:none;padding:10px 12px;color:var(--muted);font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.tabs .count{margin-left:2px}
+.tp{min-height:0;display:flex;flex-direction:column}
+.tp.scroll{overflow:auto;padding:24px 28px 48px}
+.tp-in{max-width:760px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:18px}

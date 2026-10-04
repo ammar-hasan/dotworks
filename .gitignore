@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# your own connector list and anything else that's only about your copy
+local/
+*.local.json
+.DS_Store

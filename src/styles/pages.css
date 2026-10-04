@@ -1,0 +1,26 @@
+/* pages */
+.page{flex:1;min-height:0;overflow:auto;padding:34px 40px 64px}
+.page-h{max-width:940px;margin:0 auto 24px;display:flex;flex-direction:column;gap:10px}
+.title{font:900 clamp(28px,3.8vw,46px)/1 var(--f-dot);text-transform:uppercase}
+.sub{font:italic 400 18px/1.45 var(--f-letter);color:var(--ink-2);max-width:60ch}
+.page-body{max-width:940px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.asks{display:flex;flex-direction:column;gap:12px;max-width:680px}
+.handled summary{cursor:pointer;font:400 12px var(--f-mono);color:var(--muted);list-style:none}
+.handled summary::-webkit-details-marker{display:none}
+.done-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+.done-row:first-of-type{border-top:0}
+.done-row .tick{color:var(--ok);font-family:var(--f-mono)}
+.done-row .tick.no{color:var(--faint)}
+.done-row span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.done-row a{font:400 12px var(--f-mono);color:var(--accent)}
+.mini{background:none;border:1px solid var(--line-2);border-radius:99px;padding:3px 9px;font:500 11px var(--f-mono);color:var(--ink);cursor:pointer}
+.mini:hover{border-color:var(--muted)}
+.seedgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.seedcard{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;min-width:0}
+.seedcard::before{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,hsl(var(--h) 85% 60% / calc(var(--glow) * .32)),transparent 70%);pointer-events:none}
+.sc-top{display:flex;gap:14px;align-items:center;position:relative}
+.sc-top strong{display:block;font:700 17px/1.2 var(--f-ui);letter-spacing:-.015em}
+.by{font:400 11.5px var(--f-mono);color:var(--muted)}
+.seedcard p{font-size:13.5px;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;position:relative}
+.srcs{display:flex;gap:6px;flex-wrap:wrap}
+.src{font:400 11px var(--f-mono);border:1px solid var(--line-2);border-radius:99px;padding:3px 8px;color:var(--muted)}

@@ -1,0 +1,18 @@
+<div class="app" id="app">
+  <aside class="side" aria-label="Navigation">
+    <div class="brand"><svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="6" cy="11" r="3.2" fill="hsl(210 85% 62%)"/><circle cx="12.5" cy="6.5" r="2.4" fill="hsl(30 90% 62%)"/><circle cx="16" cy="14" r="3.6" fill="hsl(150 65% 52%)"/></svg><span class="wordmark">Dotworks</span></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-h"><span class="eyebrow">Your dots</span><button class="icon-btn" data-act="new" aria-label="Make a new dot" title="Make a new dot (N)" id="sideNew"></button></div>
+    <div class="dotlist" id="dotList"></div>
+    <div class="side-foot"><div class="peers" id="peers" hidden></div><button class="me" id="meBtn" data-act="acct" aria-haspopup="dialog"></button></div>
+  </aside>
+  <main class="main" id="main">
+    <div class="ambient" aria-hidden="true"></div>
+    <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+    <div class="view" id="view"></div>
+  </main>
+  <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="pop" id="acctPop" role="dialog" aria-label="Signals and access" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>

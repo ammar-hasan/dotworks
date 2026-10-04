@@ -1,0 +1,28 @@
+/* apps */
+.appgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.appcard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.app-top{display:flex;gap:12px;align-items:center;min-width:0}
+.app-top .grow{min-width:0;display:flex;flex-direction:column}
+.app-top strong{font:600 15.5px/1.2 var(--f-ui)}
+.app-st{display:inline-flex;gap:6px;align-items:center;font:400 11.5px var(--f-mono);color:var(--muted);white-space:nowrap}
+.toolset{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:10px}
+.tools{display:flex;flex-wrap:wrap;gap:4px}
+.tool{font:400 11px var(--f-mono);border:1px solid var(--line-2);border-radius:99px;padding:2px 8px;color:var(--ink-2)}
+.tool.a{border-style:dashed}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.fld span{font:400 11px var(--f-mono);text-transform:uppercase;letter-spacing:.06em}
+.fld input[type=text],.fld textarea,.fld select{font-size:13.5px;padding:7px 9px;border-radius:9px;background:var(--panel)}
+.fld textarea{min-height:90px}
+.btn.risk{background:var(--bad);border-color:var(--bad);color:var(--bg)}
+.repo-list{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:4px}
+.repo-opt{display:flex;justify-content:space-between;gap:10px;align-items:baseline;background:none;border:0;border-radius:8px;padding:7px 9px;cursor:pointer;text-align:left;min-width:0}
+.repo-opt:hover,.repo-opt:focus-visible{background:var(--hover)}
+.repo-opt b{font:500 13px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.repo-opt small{font:400 11px var(--f-mono);color:var(--muted);white-space:nowrap}
+.repo-chip span{font:400 12px var(--f-mono)}
+.repo-chip{padding-left:9px}
+.id-row{display:flex;gap:8px;align-items:baseline;min-width:0;font:400 11.5px var(--f-mono);color:var(--muted)}
+.id-row span{text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.id-row code{font:inherit;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.btn.risk-o{border-color:var(--bad);color:var(--bad)}
+.json{font:400 12px/1.45 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto;color:var(--ink-2);margin:0}

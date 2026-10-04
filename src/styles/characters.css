@@ -1,0 +1,40 @@
+/* ───── the characters ───── */
+.av{--h:220;--s:40px;position:relative;display:inline-block;width:var(--s);height:var(--s);flex:none;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.av[data-shape="pebble"]{width:calc(var(--s) * 1.16)}
+.av .body{position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 33% 26%,hsl(var(--h) 95% 92%) 0 6%,hsl(var(--h) 85% var(--l1)) 18%,hsl(var(--h) 72% var(--l2)) 56%,hsl(var(--h) 70% var(--l3)) 100%);
+  box-shadow:0 0 calc(var(--s) * .55) hsl(var(--h) 90% 60% / calc(var(--glow) * .85)),inset 0 calc(var(--s) * -.07) calc(var(--s) * .2) hsl(var(--h) 80% 12% / .35)}
+.av[data-shape="squircle"] .body{border-radius:34%}
+.av[data-shape="blob"] .body{border-radius:58% 42% 55% 45% / 52% 48% 52% 48%;animation:morph 9s ease-in-out infinite;animation-delay:var(--bd,0s)}
+@keyframes morph{50%{border-radius:44% 56% 46% 54% / 56% 44% 56% 44%}}
+.av .eyes{position:absolute;left:0;right:0;top:39%;height:calc(var(--s) * .2);display:flex;justify-content:center;align-items:center;gap:calc(var(--s) * .15);
+  transform:translate(calc(var(--lx,0) * var(--s) * .055),calc(var(--ly,0) * var(--s) * .045));transition:transform .25s ease-out}
+.av .eye{width:calc(var(--s) * .11);height:calc(var(--s) * .17);border-radius:50%;background:var(--eye);animation:blink 6.5s infinite;animation-delay:var(--bd,0s);transform-origin:50% 60%}
+.av[data-eyes="wide"] .eye{width:calc(var(--s) * .15);height:calc(var(--s) * .19);position:relative}
+.av[data-eyes="wide"] .eye::after{content:"";position:absolute;width:34%;height:30%;border-radius:50%;background:#fff;top:18%;left:22%;opacity:.85}
+.av[data-eyes="happy"] .eye{width:calc(var(--s) * .12);height:calc(var(--s) * .12);border-radius:3px;background:none;border:calc(var(--s) * .035 + .4px) solid var(--eye);border-right-color:transparent;border-bottom-color:transparent;transform:rotate(45deg) translate(15%,15%);animation:none}
+.av[data-eyes="sleepy"] .eye{height:calc(var(--s) * .09);border-radius:0 0 99px 99px;animation:none}
+.av.rest .eye{height:calc(var(--s) * .035 + .5px) !important;width:calc(var(--s) * .13) !important;border:0 !important;border-radius:99px !important;background:var(--eye) !important;transform:none !important;animation:none !important}
+.av.rest .eye::after{display:none}
+.av.live .eye{animation:none;height:calc(var(--s) * .2)}
+.av.live[data-eyes="happy"] .eye{height:calc(var(--s) * .12)}
+.av .mouth{position:absolute;left:50%;top:63%;width:calc(var(--s) * .13);height:calc(var(--s) * .05);transform:translateX(-50%);border-radius:0 0 99px 99px;background:var(--eye);opacity:0;transition:opacity .2s}
+.av.talk .mouth{opacity:.85;animation:talk .26s infinite alternate}
+@keyframes talk{to{height:calc(var(--s) * .1);border-radius:99px}}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}95%{transform:scaleY(.08)}}
+.av .acc{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.av .zz{position:absolute;right:-6%;top:-12%;font:700 calc(var(--s) * .2 + 2px)/1 var(--f-mono);color:var(--muted);opacity:0}
+.av.rest .zz{animation:zz 3.6s ease-in-out infinite;animation-delay:var(--bd,0s)}
+@keyframes zz{0%{opacity:0;transform:translate(0,4px) scale(.8)}30%{opacity:.85}100%{opacity:0;transform:translate(6px,-10px) scale(1.1)}}
+.av .ring{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.av.live .ring::before,.av.live .ring::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1.5px solid hsl(var(--h) 90% 70% / .85);animation:ripple 2.2s cubic-bezier(.2,.6,.3,1) infinite}
+.av.live .ring::after{animation-delay:1.1s}
+@keyframes ripple{from{transform:scale(1);opacity:.9}to{transform:scale(2.2);opacity:0}}
+.av .sat{position:absolute;inset:-14%;border-radius:50%;border:1px solid hsl(var(--h) 60% 70% / .25);display:none;animation:spin 16s linear infinite}
+.av .sat::after{content:"";position:absolute;top:-3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--cloud);box-shadow:0 0 10px var(--cloud)}
+.av.cloud .sat{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.av .badge{position:absolute;top:-6%;right:-10%;min-width:calc(var(--s) * .3 + 6px);height:calc(var(--s) * .3 + 6px);padding:0 4px;border-radius:99px;background:var(--warn);color:var(--on-warn);font:700 calc(var(--s) * .17 + 4px)/calc(var(--s) * .3 + 6px) var(--f-mono);text-align:center;z-index:2;box-shadow:0 0 0 2px var(--bg-2)}
+.av.seed .body{background:radial-gradient(circle,hsl(var(--h) 85% 70% / .22),transparent 66%);box-shadow:0 0 30px hsl(var(--h) 90% 60% / calc(var(--glow) * .45)),inset 0 0 0 1.5px hsl(var(--h) 75% 70% / .6)}
+.av.seed .eye,.av.seed .acc{opacity:.55}
+@media (prefers-reduced-motion:reduce){.av *, .av .ring::before,.av .ring::after{animation:none !important}.av .eyes{transition:none}}

@@ -1,0 +1,48 @@
+/* ───── app shell ───── */
+.app{height:100%;display:grid;grid-template-columns:268px minmax(0,1fr)}
+.side{min-height:0;display:flex;flex-direction:column;gap:4px;padding:16px 12px 12px;background:var(--side);border-right:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px}
+.brand svg{width:22px;height:22px;flex:none}
+.wordmark{font:900 20px/1 var(--f-dot);letter-spacing:.02em}
+.nav{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.nav-i{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:11px;border:0;background:none;cursor:pointer;color:var(--ink-2);font-weight:500;text-align:left}
+.nav-i svg{width:18px;height:18px;opacity:.85}
+.nav-i:hover{background:var(--hover)}
+.nav-i[aria-current="page"]{background:var(--sel);color:var(--ink)}
+.count{margin-left:auto;font:600 11px/18px var(--f-mono);min-width:20px;height:18px;padding:0 6px;border-radius:99px;background:var(--warn);color:var(--on-warn);text-align:center}
+.count:empty{display:none}
+.side-h{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 4px 10px}
+.dotlist{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px;padding:2px 0}
+.dl-i{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:center;padding:7px 9px;border-radius:13px;border:0;background:none;cursor:pointer;text-align:left;color:var(--ink);width:100%}
+.dl-i:hover{background:var(--hover)}
+.dl-i[aria-current="true"]{background:var(--sel)}
+.dl-t{min-width:0;display:flex;flex-direction:column}
+.dl-t b{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl-t small{font:400 11.5px/1.35 var(--f-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl-t small.cl{color:var(--cloud)} .dl-t small.live{color:var(--accent)} .dl-t small.warn{color:var(--warn)}
+.dl-empty{padding:8px 10px;font-size:13px;color:var(--muted);line-height:1.45}
+.side-foot{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding-top:10px;border-top:1px solid var(--line);margin-top:6px}
+.me{display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:6px 8px;border-radius:12px;border:0;background:none;cursor:pointer;text-align:left;color:var(--ink)}
+.me:hover{background:var(--hover)}
+.me img{width:30px;height:30px;border-radius:50%;flex:none}
+.me span{min-width:0;display:flex;flex-direction:column}
+.me b{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me small{font:400 11px var(--f-mono);color:var(--muted)}
+.me .issue{width:8px;height:8px;border-radius:50%;background:var(--bad);margin-left:auto;flex:none;box-shadow:0 0 8px var(--bad)}
+.peers{display:flex;align-items:center;gap:10px;padding:2px 10px 4px;font:400 11px/1 var(--f-mono);color:var(--muted)}
+.peers .faces{display:flex;align-items:center}
+.peers img{width:22px;height:22px;border-radius:50%;border:2px solid var(--side);margin-left:-6px;background:var(--panel)}
+.peers img:first-child{margin-left:0}
+.peers img.busy{box-shadow:0 0 0 2px var(--accent)}
+
+.main{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-2);--amb:230}
+.ambient{position:absolute;inset:-10%;pointer-events:none;z-index:0;opacity:.95;transition:opacity .8s;
+  background:radial-gradient(42% 46% at 78% 6%,hsl(var(--amb) 85% 60% / calc(var(--glow) * .26)),transparent 70%),radial-gradient(36% 40% at 12% 100%,hsl(calc(var(--amb) + 55) 85% 60% / calc(var(--glow) * .15)),transparent 70%)}
+.view{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column}
+.tabbar{display:none}
+.sky{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;transition:opacity .6s}
+.main.on-home .sky{opacity:1}
+.banner{position:relative;z-index:3;margin:14px 40px 0;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line-2);border-left:3px solid var(--warn);border-radius:14px;padding:12px 14px;font-size:13.5px;color:var(--ink-2)}
+.banner b{color:var(--ink);font-weight:600}
+.banner .grow{min-width:200px}
+.banner:empty{display:none}

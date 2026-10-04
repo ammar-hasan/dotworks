@@ -1,0 +1,29 @@
+{
+  "name": "dotworks",
+  "version": "6.2.0",
+  "description": "Small character assistants that read your apps and ask before they act. Published as a Claude artifact.",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ammar-hasan/dotworks.git"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "preview": "node scripts/build.mjs --preview",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node test/behaviour.cjs",
+    "screens": "npm run build && node test/screens.cjs",
+    "manifest": "node scripts/manifest.mjs",
+    "check": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^29.1.1",
+    "typescript": "~5.9"
+  }
+}

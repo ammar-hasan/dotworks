@@ -1,0 +1,85 @@
+{
+  "templates": [
+    {
+      "id": "meeting-prep",
+      "name": "Meeting prep",
+      "hue": 214,
+      "sources": [
+        "Google Calendar",
+        "Gmail"
+      ],
+      "cadence": "daily",
+      "tier": "default",
+      "responsibility": "Look at my meetings for the next two days. Flag invites I haven't answered, meetings with no agenda, and big meetings where I might not be needed. Check email for anything I should read before each one.",
+      "rules": [
+        "Propose an RSVP for every invite I haven't answered",
+        "Draft a short, friendly note asking for an agenda when one is missing"
+      ],
+      "look": {
+        "shape": "squircle",
+        "eyes": "round",
+        "acc": "glasses"
+      }
+    },
+    {
+      "id": "inbox-triage",
+      "name": "Inbox triage",
+      "hue": 28,
+      "sources": [
+        "Gmail"
+      ],
+      "cadence": "hourly",
+      "tier": "quick",
+      "responsibility": "Scan unread email from the last day. Separate what needs a reply from me from newsletters and notifications, and sum up the ones that matter in one line each.",
+      "rules": [
+        "Ignore newsletters and automated notifications",
+        "Draft at most 2 replies"
+      ],
+      "look": {
+        "shape": "orb",
+        "eyes": "wide",
+        "acc": "headphones"
+      }
+    },
+    {
+      "id": "focus-guard",
+      "name": "Focus guard",
+      "hue": 268,
+      "sources": [
+        "Google Calendar"
+      ],
+      "cadence": "daily",
+      "tier": "quick",
+      "responsibility": "Look at tomorrow between 9:00 and 18:00. If I have less than two free hours in a row, find the best gap and propose a focus block so the day isn't all meetings.",
+      "rules": [
+        "Never propose more than 2 hours of focus time",
+        "Leave 13:00 to 14:00 free for lunch"
+      ],
+      "look": {
+        "shape": "blob",
+        "eyes": "happy",
+        "acc": "shades"
+      }
+    },
+    {
+      "id": "week-ahead",
+      "name": "Week ahead",
+      "hue": 152,
+      "sources": [
+        "Google Calendar",
+        "Gmail"
+      ],
+      "cadence": "weekly",
+      "tier": "complex",
+      "responsibility": "Look at the next seven days of meetings alongside recent email about them. Tell me which days are overloaded, which meetings have open questions in email, and where I could win back time.",
+      "rules": [
+        "Point out days with more than 5 hours of meetings"
+      ],
+      "look": {
+        "shape": "pebble",
+        "eyes": "round",
+        "acc": "antenna"
+      }
+    }
+  ]
+}

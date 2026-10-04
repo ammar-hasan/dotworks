@@ -1,0 +1,29 @@
+/* activity + cloud + settings */
+.act-row{border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.act-row summary{cursor:pointer;display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 16px;list-style:none}
+.act-row summary::-webkit-details-marker{display:none}
+.act-row .sd{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.act-row .sd.ok{background:var(--ok)} .act-row .sd.bad{background:var(--bad)}
+.act-row .t{min-width:0}
+.act-row .t b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act-row .t small{font:400 11.5px var(--f-mono);color:var(--muted)}
+.act-row[open]{padding-bottom:14px}
+.act-row .inner{padding:0 16px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.cloud-card{flex-direction:row;align-items:flex-start;gap:18px}
+.cloud-art{width:56px;height:56px;flex:none;position:relative;border-radius:50%;border:1px dashed var(--line-2);margin-top:2px}
+.cloud-art i{position:absolute;inset:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,hsl(var(--h) 95% 88%),hsl(var(--h) 72% 52%));box-shadow:0 0 16px hsl(var(--h) 90% 60% / .5)}
+.cloud-art b{position:absolute;inset:-1px;border-radius:50%;animation:spin 9s linear infinite}
+.cloud-art b::after{content:"";position:absolute;top:-4px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--faint)}
+.cloud-art.on b::after{background:var(--cloud);box-shadow:0 0 10px var(--cloud)}
+.cloud-art.off b{animation:none}
+@media (prefers-reduced-motion:reduce){.cloud-art b{animation:none}}
+.cloud-body{display:flex;flex-direction:column;gap:12px;min-width:0;flex:1}
+.cloud-body h3{font:700 18px/1.25 var(--f-ui);letter-spacing:-.015em}
+.cloud-status{display:flex;flex-wrap:wrap;gap:4px 14px;font:400 12.5px/1.4 var(--f-mono);color:var(--muted)}
+.cloud-status b{color:var(--ink-2);font-weight:500}
+.cloud-status .ok{color:var(--ok)} .cloud-status .bad{color:var(--bad)}
+.pickers{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pickers select{width:auto}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink-2)}
+@media (max-width:520px){.cloud-card{flex-direction:column}}
