@@ -286,6 +286,7 @@ async function load(rt, extra = {}) {
     beforeParse(w) {
       if (rt) { w.claude = rt.claude; rt.attach(w); }
       if (extra.hot && rt) w.claude = Object.freeze({ ...rt.claude, hot: extra.hot });
+      if (extra.speech) installSpeech(w, extra);
       w.Element.prototype.scrollIntoView = function () {};
       w.HTMLElement.prototype.scrollTo = function () {};
       w.fetch = async () => ({ ok: true, text: async () => "Team: Sara (design), Omar (eng)" });
@@ -295,6 +296,26 @@ async function load(rt, extra = {}) {
   });
   await tick(extra.wait ?? 160);
   return { dom, w: dom.window, d: dom.window.document, errors };
+}
+// the browser's speech: built-in voices that "speak" quickly, and (when allowed) a recogniser that hears one phrase
+function installSpeech(w, extra) {
+  const log = extra.speech;
+  log.spoken = []; log.recs = 0; log.cancels = 0;
+  w.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
+  w.speechSynthesis = {
+    getVoices: () => [{ name: "Samantha", lang: "en-US" }, { name: "Alex", lang: "en-US" }, { name: "Thomas", lang: "fr-FR" }],
+    addEventListener() {},
+    speak(u) { log.spoken.push({ text: u.text, voice: u.voice?.name, pitch: u.pitch, rate: u.rate }); setTimeout(() => { u.onstart?.(); setTimeout(() => u.onend?.(), extra.speakMs ?? 40); }, 5); },
+    cancel() { log.cancels++; },
+  };
+  Object.defineProperty(w.document, "featurePolicy", { value: { allowsFeature: f => f === "microphone" ? !!extra.mic : true }, configurable: true });
+  if (extra.mic) w.webkitSpeechRecognition = class {
+    start() { log.recs++; const said = (extra.said || [])[log.recs - 1]; setTimeout(() => {
+      if (extra.micError) { this.onerror?.({ error: extra.micError }); this.onend?.(); return; }
+      if (said) this.onresult?.({ results: [Object.assign([{ transcript: said }], { isFinal: true })] });
+      this.onend?.(); }, 20); }
+    stop() { setTimeout(() => this.onend?.(), 1); }
+  };
 }
 // a click the platform can prove: the flag is up only while the event is being dispatched
 const click = (w, el) => { if (!el) throw new Error("missing element to click"); w.__inGesture = true; try { el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true })); } finally { w.__inGesture = false; } };
@@ -964,6 +985,74 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(!rows.find(x => /Old reply/.test(x.textContent)).querySelector('[data-act="undo"]'), "after a day, no Undo");
     click(w, rows.find(x => /New reply/.test(x.textContent)).querySelector('[data-act="undo"]')); await tick(80);
     ok(/Couldn't undo it: Draft not found/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")) && !rt.db.store.get(`data/users/${UID}/act_new`)?.result?.undone, "if it changed since, it says so and changes nothing");
+  }
+  console.log("28. Voice: atoms talk back; you talk by mic where allowed, or dictation");
+  {
+    const sp = {};
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_v`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/dot_v/runs/run_n`, { startedAt: Date.now() - 3600e3, finishedAt: Date.now() - 3590e3, status: "done", source: "page", text: "## Two things need you\n- **Dashboard review** at 17:00\n- Read https://example.com/x first", steps: [], thread: [], actionIds: [] });
+    const { w, d, errors } = await load(rt, { wait: 300, speech: sp });
+    click(w, d.querySelector('#dotList [data-id="dot_v"]')); await tick(60);
+    ok(!!d.querySelector('#cmpChips [data-act="voice-toggle"]') && d.querySelector("#micBtn")?.hidden === true, "voice chip offered; no mic button where the page can't use the microphone");
+    click(w, d.querySelector('#msgs [data-act="speak-note"]')); await tick(20);
+    ok(sp.spoken.length === 1 && sp.spoken[0].text === "Two things need you. Dashboard review at 17:00. Read a link first" && sp.spoken[0].voice && sp.spoken[0].pitch >= 0.9 && sp.spoken[0].pitch < 1.4, "Read aloud: the note in plain words, in the atom's own voice: " + JSON.stringify(sp.spoken[0]));
+    ok(/talk/.test(d.querySelector("#dvAv .av")?.className || ""), "its mouth moves while it speaks");
+    await tick(80);
+    ok(!/talk/.test(d.querySelector("#dvAv .av")?.className || ""), "and stops when it's done");
+    const again = sp.spoken.length; click(w, d.querySelector('#msgs [data-act="speak-note"]')); await tick(20);
+    ok(sp.spoken.length === again + 1 && sp.spoken[again].text === sp.spoken[0].text, "same atom, same voice every time");
+    await tick(80);
+    click(w, d.querySelector('#cmpChips [data-act="voice-toggle"]')); await tick(20);
+    ok(d.querySelector('#cmpChips [data-act="voice-toggle"]').getAttribute("aria-pressed") === "true" && w.localStorage.getItem("atoms.voice") === "on" && /keyboard's mic/.test(d.querySelector("#reply").placeholder), "voice mode on: remembered here, and says how to talk without a mic");
+    const ta = d.querySelector("#reply"); ta.focus(); typeIn(w, ta, "What's on tomorrow?"); await tick(2700);
+    ok(rt.calls.sample.some(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === "What's on tomorrow?"), "dictation: a pause sends it");
+    await tick(200);
+    ok(sp.spoken.some(x => /keep the reply short/.test(x.text)), "the reply is read aloud");
+    click(w, d.querySelector('#cmpChips [data-act="voice-toggle"]')); await tick(20);
+    ok(w.localStorage.getItem("atoms.voice") === "off" && sp.cancels > 0, "voice off: stops talking");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  {
+    const sp = {};
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_v`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    const { w, d, errors } = await load(rt, { wait: 300, speech: sp, mic: true, said: ["What's first tomorrow", "Thanks"] });
+    click(w, d.querySelector('#dotList [data-id="dot_v"]')); await tick(60);
+    click(w, d.querySelector('#cmpChips [data-act="voice-toggle"]')); await tick(20);
+    ok(d.querySelector("#micBtn")?.hidden === false, "where the mic is allowed: a mic button");
+    click(w, d.querySelector("#micBtn")); await tick(700);
+    ok(rt.calls.sample.some(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === "What's first tomorrow"), "what you say is sent");
+    ok(sp.spoken.length >= 1 && sp.recs >= 2, "it answers aloud, then listens again: " + sp.recs);
+    await tick(700);
+    ok(rt.calls.sample.some(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === "Thanks"), "a hands-free back and forth");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  {
+    const sp = {};
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_v`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    const { w, d } = await load(rt, { wait: 300, speech: sp, mic: true, micError: "not-allowed" });
+    click(w, d.querySelector('#dotList [data-id="dot_v"]')); await tick(60);
+    click(w, d.querySelector("#micBtn")); await tick(80);
+    ok(d.querySelector("#micBtn")?.hidden === true && /microphone isn't available/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "mic refused: the button goes, and it says to use your keyboard's mic");
+    // its voice, picked in settings
+    click(w, d.querySelector('#dvTabs [data-tab="settings"]')); await tick(40);
+    const sel = d.querySelector("#st-voice");
+    ok(sel && [...sel.options].map(o => o.value).join(",") === ",Alex,Samantha", "settings: voices in your language");
+    sel.value = "Alex"; sel.dispatchEvent(new w.Event("change", { bubbles: true }));
+    click(w, d.querySelector('[data-act="voice-try"]')); await tick(20);
+    ok(sp.spoken.pop()?.voice === "Alex", "Hear it: plays the picked voice");
+    submit(w, d.querySelector("#st-form")); await tick(150);
+    ok(rt.db.store.get(`data/users/${UID}/dot_v`)?.voice?.name === "Alex", "saved with the atom");
+  }
+  {
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_v`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_v"]')); await tick(60);
+    ok(!d.querySelector('#cmpChips [data-act="voice-toggle"]') && !d.querySelector('#msgs [data-act="speak-note"]') && d.querySelector("#micBtn")?.hidden === true, "no speech on this device: no voice controls at all");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");
   {

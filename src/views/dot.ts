@@ -5,6 +5,7 @@ import { $, ago, dayLabel, esc, fmtTime, fmtWhen, handleOf, headlineOf, hueOf, m
 import { NS, S, cloudOn, curDot, isNarrow, pending, sendOK } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
 import { receiptHtml } from "../features/receipts";
+import { canListen, canSpeak } from "../features/voice";
 import { appsMissingFor, cloudFiringFor, paintCloud } from "../features/cloud";
 import { avatarHtml, lookOf, stateOf } from "../ui/characters";
 import { dotStatus } from "../ui/shell";
@@ -51,6 +52,7 @@ export function noteBlock(r, d) {
   const steps = r.steps?.length ? `<details class="steps-sum"><summary>${plural(r.steps.length, "step")} · ${r.steps.filter(s => s.state === "ok").length} ok</summary>${threadHtml(r.steps)}</details>` : "";
   const status = r.status === "done" ? "" : `<p class="status ${r.status === "failed" ? "bad" : ""}">${esc(statusCopy(r))}</p>`;
   const acts = [
+    canSpeak() && r.text ? `<button class="btn ghost sm" data-act="speak-note" data-id="${esc(r.id)}" aria-pressed="${S.speakingNote === r.id}">${ICON.voice}${S.speakingNote === r.id ? "Stop" : "Read aloud"}</button>` : "",
     sendOK() && r.text ? `<button class="btn ghost sm" data-act="ask-claude" data-id="${esc(r.id)}">Ask Claude about this</button>` : "",
     NS.downloads && r.text ? `<button class="btn ghost sm" data-act="export" data-id="${esc(r.id)}">Save .md</button>` : "",
     NS.comments && !S.commentsOff ? `<button class="btn ghost sm" data-act="comment">Comment</button>` : "",
@@ -71,7 +73,7 @@ export function paintChat() {
   for (const r of runs) {
     const dl = dayLabel(r.startedAt);
     if (dl !== lastDay) { lastDay = dl; blocks.push({ key: "day:" + dl, html: `<div class="daysep" data-key="day:${esc(dl)}">${esc(dl)}</div>`, sig: dl }); }
-    if (r.kind !== "chat") { const html = noteBlock(r, d); blocks.push({ key: "note:" + r.id, html, sig: html.length + ":" + JSON.stringify([r.text, r.status, r.steps, sendOK(), !!NS.downloads, !!NS.comments && !S.commentsOff, hueOf(d), lookOf(d), d.name]) }); }
+    if (r.kind !== "chat") { const html = noteBlock(r, d); blocks.push({ key: "note:" + r.id, html, sig: html.length + ":" + JSON.stringify([r.text, r.status, r.steps, sendOK(), !!NS.downloads, !!NS.comments && !S.commentsOff, hueOf(d), lookOf(d), d.name, S.speakingNote === r.id]) }); }
     const items = [
       ...(Array.isArray(r.thread) ? r.thread : []).map((t, i) => ({ at: t.at || 0, kind: "turn", t, i })),
       ...myActs.filter(a => a.runId === r.id).map(a => ({ at: a.createdAt || 0, kind: "ask", a })),
@@ -119,18 +121,23 @@ export function paintComposer() {
   const f = $("#composer"), d = curDot(); if (!f || !d) return;
   const busy = !!(S.chat && S.chat.dotId === d.id), ta = $("#reply"), live = S.running?.dotId === d.id;
   const can = !!NS.sample && (S.perms as any).sample !== "denied";
-  ta.placeholder = can ? `Message ${handleOf(d)}…` : NS.sample ? "Allow Claude on this page to talk to your atoms" : "Open this page inside Claude to talk to your atoms";
+  const mic = can && canListen();
+  ta.placeholder = !can ? (NS.sample ? "Allow Claude on this page to talk to your atoms" : "Open this page inside Claude to talk to your atoms")
+    : S.listening ? "Listening…" : S.voiceOn && !mic ? `Talk with your keyboard's mic; it sends when you pause` : `Message ${handleOf(d)}…`;
   ta.disabled = busy || !can || live || !S.runsLoaded;
   const send = $("#replySend");
   if (busy) { send.dataset.act = "chat-stop"; send.type = "button"; send.innerHTML = ICON.stop; send.setAttribute("aria-label", "Stop"); }
   else { delete send.dataset.act; send.type = "submit"; send.innerHTML = ICON.send; send.setAttribute("aria-label", "Send"); }
   send.disabled = !busy && (!can || live || !S.runsLoaded);
   $("#attachLbl").hidden = !S.imagesOK || !can;
+  const micBtn = $("#micBtn");
+  if (micBtn) { micBtn.hidden = !mic; micBtn.setAttribute("aria-pressed", String(!!S.listening)); micBtn.disabled = busy || live || !S.runsLoaded; micBtn.setAttribute("aria-label", S.listening ? "Stop listening" : "Talk"); }
   const src = normSources(d.sources), q = S.runs[0]?.text ? ["What should I do first?", "What should I do first?"]
     : src.includes("Google Calendar") ? ["What's on tomorrow?", "What's on my calendar tomorrow?"]
     : src.includes("Gmail") ? ["Anything urgent?", "Is anything urgent in my inbox?"] : null;
+  const voiceChip = can && canSpeak() ? `<button type="button" class="chip voice-chip" data-act="voice-toggle" aria-pressed="${!!S.voiceOn}" title="${S.voiceOn ? "Voice on: replies are read aloud" : "Turn on voice: replies are read aloud"}">${ICON.voice}Voice${S.voiceOn ? " on" : ""}</button>` : "";
   const chips = live ? `<button type="button" class="chip" data-act="stop">${ICON.stop}Stop waking</button>`
-    : can && !busy ? `<button type="button" class="chip" data-act="run" ${S.running ? "disabled" : ""}>${ICON.bolt}Wake now</button>${q && S.runsLoaded ? `<button type="button" class="chip" data-act="suggest" data-id="${esc(q[1])}">${esc(q[0])}</button>` : ""}` : "";
+    : can && !busy ? `<button type="button" class="chip" data-act="run" ${S.running ? "disabled" : ""}>${ICON.bolt}Wake now</button>${q && S.runsLoaded ? `<button type="button" class="chip" data-act="suggest" data-id="${esc(q[1])}">${esc(q[0])}</button>` : ""}${voiceChip}` : voiceChip;
   const cb = $("#cmpChips"); if (cb.innerHTML !== chips) cb.innerHTML = chips;
   const att = $("#replyAtt");
   if (S.replyImage) {

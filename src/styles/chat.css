@@ -65,3 +65,10 @@
 .done-line .dl-t{display:flex;flex-direction:column;gap:3px;min-width:0}
 .q-done .tick{color:var(--accent)}
 .q-done .q-ans{font-weight:600;color:var(--ink);background:var(--bg-2);border-radius:99px;padding:2px 10px}
+/* voice */
+.voice-chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cmp-box .mic{flex:none;width:36px;height:36px;border-radius:50%}
+.cmp-box .mic[aria-pressed="true"]{background:hsl(350 85% 60% / .16);color:var(--bad);box-shadow:0 0 0 0 hsl(350 85% 60% / .5);animation:listening 1.3s ease-out infinite}
+@keyframes listening{to{box-shadow:0 0 0 10px hsl(350 85% 60% / 0)}}
+@media (prefers-reduced-motion:reduce){.cmp-box .mic[aria-pressed="true"]{animation:none}}
+.note-acts .btn svg,.btn.ghost.sm svg{width:14px;height:14px}

@@ -36,6 +36,8 @@ const shots = [
   { name: "chat-qa-dark", scene: "full", ...D, scheme: "dark", steps: [openDot("Inbox triage"), async p => { await p.evaluate(() => { const m = document.querySelector("#msgs"); if (m) m.scrollTop = 0; }); await p.waitForTimeout(200); }] },
   { name: "asks-question-light", scene: "full", ...D, scheme: "light", steps: [nav("asks"), async p => { await p.click('#asksFilter [data-id="question"]'); await p.waitForTimeout(400); }] },
   { name: "m-asks-question-dark", scene: "full", ...M, scheme: "dark", steps: [navM("asks"), async p => { await p.click('#asksFilter [data-id="question"]'); await p.waitForTimeout(400); }] },
+  { name: "dot-voice-dark", scene: "full", ...D, scheme: "dark", steps: [openDot("Meeting prep"), click('[data-act="voice-toggle"]')] },
+  { name: "m-dot-voice-light", scene: "full", ...M, scheme: "light", steps: [openDotM("Meeting prep"), click('[data-act="voice-toggle"]')] },
   { name: "tell-pick-dark", scene: "full", ...D, scheme: "dark", steps: [async p => { await p.fill("#tellIn", "Keep an eye on the launch"); await p.press("#tellIn", "Enter"); await p.waitForTimeout(600); }] },
   { name: "asks-light", scene: "full", ...D, scheme: "light", steps: [nav("asks")] },
   { name: "seeds-dark", scene: "full", ...D, scheme: "dark", steps: [nav("seeds")] },

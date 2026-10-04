@@ -36,12 +36,14 @@ To pick up new code or an app you've just connected, say **"update Atoms"** in t
 - **Asks** are tool calls in waiting: the card is built from the tool's own schema, you can edit every argument, and only *Approve* runs it. Afterwards a receipt says what changed, with an Undo where there's an exact way back.
 - **Questions**: when the right move depends on something only you know, an atom asks with a few answers to tap, and carries on as soon as you answer.
 - **One box on Home**: type what you want and it goes to the atom whose job fits, or offers to make one.
+- **Voice**: turn on voice on an atom's page and it reads its replies aloud in its own voice (your device's built-in voices; pick one in its settings). Any note has *Read aloud*. You talk back with your keyboard's mic, and in voice mode your message goes when you pause. Where the page may use the microphone, a mic button gives you a hands-free back and forth.
 
 ### Platform limits worth knowing
 
 - A page can create a routine but can't attach connectors to it. After **Keep it awake**, open the atom's routine (the app links to it) and tick its apps under *Edit → Connectors*. The app shows what's missing until you do.
 - A page declares the connectors and tools it may use (its manifest), at most 128 tools per connector. Declaring more later makes viewers approve the new ones once.
 - Routines read GitHub through the REST API (`gh api …`); GraphQL isn't available there.
+- Artifact pages can't use the microphone today, so the mic button stays hidden there; speaking aloud works anywhere the device has voices.
 
 ## Develop
 
@@ -62,7 +64,7 @@ npm run manifest   # dist/capabilities.json from local/connectors.json
 | `src/core/` | State (`S`, `NS`), boot and store subscriptions, the app registry, helpers, diagnostics, presence, hot reload |
 | `src/ui/` | Shell, navigation, account popover, characters, and the one delegated event handler (`events.ts`) |
 | `src/views/` | Home, an atom (chat, activity, schedule, settings), elements, apps, the atom builder |
-| `src/features/` | Asks, questions, receipts and undo, the Home box, cloud schedules, repos, deleting an atom |
+| `src/features/` | Asks, questions, receipts and undo, the Home box, voice, cloud schedules, repos, deleting an atom |
 | `src/ai/` | Waking an atom, tool schemas, the digest |
 | `src/styles/`, `src/page/` | CSS and the page markup |
 | `src/platform/` | Type definitions for Claude's artifact runtime |

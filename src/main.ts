@@ -3,6 +3,7 @@ import { diag } from "./core/diag";
 import { hotSnapshot } from "./core/hot";
 import { S } from "./core/state";
 import { renderAll } from "./ui/shell";
+import { loadVoicePref } from "./features/voice";
 // modules that register listeners when loaded
 import "./core/diag";
 import "./ui/events";
@@ -10,6 +11,7 @@ import "./views/home";
 import "./features/cloud";
 
 /* ═════════ start: once, whichever way the viewer hands us the go-ahead ═════════ */
+loadVoicePref();
 let started = false;
 const start = data => { if (started) return; started = true; boot(data).catch(e => { diag("boot", e); S.booted = true; renderAll(); }); };
 renderAll();

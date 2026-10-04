@@ -1,5 +1,6 @@
 import { pruneRuns } from "../ai/flow";
 import { flushPendingSend } from "../features/tell";
+import { stopListening, stopSpeaking } from "../features/voice";
 import { SRV } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, clone } from "../core/helpers";
@@ -12,7 +13,7 @@ import { paintDot } from "../views/dot";
 
 /* ═════════ navigation ═════════ */
 export function go(view) {
-  if (view !== "dot") { if (S.unsubRuns) { S.unsubRuns(); S.unsubRuns = null; } S.selected = null; }
+  if (view !== "dot") { if (S.unsubRuns) { S.unsubRuns(); S.unsubRuns = null; } S.selected = null; stopSpeaking(); stopListening(); }
   S.view = view; S.confirmDel = false; closeAcct(false);
   setPresence(); renderAll();
   $("#view")?.scrollTo?.(0, 0);
@@ -20,6 +21,7 @@ export function go(view) {
 export function openDot(id, tab?) {
   if (!id) return go("home");
   const changed = S.selected !== id;
+  if (changed) { stopSpeaking(); stopListening(); }
   S.view = "dot"; S.selected = id; S.tab = tab || (changed ? "chat" : S.tab) || "chat"; S.confirmDel = false; S.hzSel = null;
   if (changed) {
     S.editDraft = null; S.editFile = null;

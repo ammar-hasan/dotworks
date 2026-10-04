@@ -15,7 +15,7 @@ const init = {
   peers: [], canSend: "off", perms: {}, conn: {}, connLoaded: false, toolsOK: null, imagesOK: null,
   triggers: null, trigErr: null, trigLoading: false, cloudOpen: {}, cloudDraft: {}, cloudFiring: {}, cloudBusy: {}, cloudStep: {}, cloudEnv: null, gone: new Set(), trigTried: {},
   day: null, dayErr: null, dayKey: null, dayUnsub: null, hzSel: null,
-  tell: null as null | Record<string, any>, cheer: {} as Record<string, number>, pendingSend: null as null | { dotId: string; text: string },
+  tell: null as null | Record<string, any>, cheer: {} as Record<string, number>, voiceOn: false, speaking: null as null | string, listening: false, micBlocked: false, handsFree: false, pendingSend: null as null | { dotId: string; text: string },
   digest: null, digestBusy: false, digestTried: false, digestOff: false, assetsUsage: null, diag: [],
   env: { claude: false, use: false, hot: false, caps: {} } as Record<string, any>, capsLeft: 0, commentsOff: false, fresh: new Map(), seen: new Set(),
 };

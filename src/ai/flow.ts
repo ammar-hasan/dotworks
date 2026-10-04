@@ -7,6 +7,7 @@ import { $, autosize, clamp, clean, clone, fmtDay, handleOf, headlineOf, newId, 
 import { setPresence } from "../core/room";
 import { NS, S, curDot, dueDots, runsCol, userDoc } from "../core/state";
 import { newQuestion, openAnswers } from "../features/questions";
+import { canListen, listen, speak } from "../features/voice";
 import { avatarHtml, stateOf } from "../ui/characters";
 import { go, openDot } from "../ui/nav";
 import { renderAll } from "../ui/shell";
@@ -269,7 +270,7 @@ The owner is talking with you. Use your tools if you need fresh information, and
 }
 export async function sendReply(preset?) {
   const d = curDot(), ta = $("#reply");
-  const text = clean(preset || ta?.value || "").trim();
+  const text = clean(preset || ta?.value || "").trim(), inBox = clean(ta?.value || "").trim();
   if (!d || !text || !NS.sample || !S.runsLoaded || (S.chat && S.chat.dotId === d.id) || S.running?.dotId === d.id) return;
   if (!NS.db || !S.uid) { toast("Memory is off in this view, so the conversation can't be kept."); return; }
   let r = S.runs[0];
@@ -281,9 +282,18 @@ export async function sendReply(preset?) {
   }
   const img = S.imagesOK ? S.replyImage : null;
   const userTurn = { role: "you", text: text.slice(0, 2000), at: Date.now(), ...(img ? { image: clean(img.name).slice(0, 60) } : {}) };
-  if (ta && !preset) { ta.value = ""; autosize(ta); } S.replyImage = null; const rn = $("#replyNote"); if (rn) rn.textContent = "";
+  // the box empties when its words are the ones going out: typed, or put there by the mic
+  if (ta && (!preset || inBox === text)) { ta.value = ""; autosize(ta); } S.replyImage = null; const rn = $("#replyNote"); if (rn) rn.textContent = "";
   const { dotTurn, errMsg } = await converse(d, r, userTurn, img);
   if (errMsg && S.view === "dot" && S.selected === d.id) { const n = $("#replyNote"); if (n) n.textContent = errMsg; if (!dotTurn && $("#reply") && !$("#reply").value) $("#reply").value = text; }
+  if (dotTurn) voiceReply(d, dotTurn.text);
+}
+
+// voice mode: the atom reads its reply aloud; if you spoke to it through the mic, it listens again after
+export async function voiceReply(d, text) {
+  if (!S.voiceOn || !(S.view === "dot" && S.selected === d.id)) return;
+  const spoke = await speak(d, text);
+  if (spoke && S.handsFree && S.voiceOn && canListen() && S.view === "dot" && S.selected === d.id && !S.chat && !S.running) listen(t => { S.handsFree = true; sendReply(t); });
 }
 
 /* one turn of conversation on a note's thread: your words in, the dot's reply (with its tools) out, both saved.
@@ -338,6 +348,6 @@ export async function carryOn(d, a) {
   toast(`${d.name} is on it`, here ? undefined : { label: "Watch", fn: () => openDot(d.id, "chat") });
   const userTurn = { role: "you", kind: "answer", actId: a.id, text: `My answer to your question “${clean(a.title)}”: ${clean(a.answer.text)}`, at: a.answer.at || Date.now() };
   const { dotTurn } = await converse(d, r, userTurn);
-  if (dotTurn) { upsertLocal(S.actions, a.id, { continuedAt: Date.now() }); userDoc(a.id).update({ continuedAt: Date.now() }).catch(e => diag("db.answerUsed", e)); }
+  if (dotTurn) { upsertLocal(S.actions, a.id, { continuedAt: Date.now() }); userDoc(a.id).update({ continuedAt: Date.now() }).catch(e => diag("db.answerUsed", e)); voiceReply(d, dotTurn.text); }
   else later();
 }

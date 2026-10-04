@@ -9,6 +9,7 @@ import { refreshCanSend } from "../core/room";
 import { NS, S, curDot, userDoc } from "../core/state";
 import { answerQuestion, execute, setActionState, undoAction } from "../features/asks";
 import { deliver, newDotFrom, paintTell, tellDots } from "../features/tell";
+import { cancelAutoSend, dictationPaused, listen, setVoiceMode, speak, stopListening, stopSpeaking } from "../features/voice";
 import { cloudAct, cloudCreate, cloudFind, cloudPlan, loadTriggers, paintCloud } from "../features/cloud";
 import { deleteDot } from "../features/delete";
 import { allow, closeAcct, renderAcct } from "./account";
@@ -63,6 +64,15 @@ document.addEventListener("click", ev => {
     case "drop-img": S.replyImage = null; paintComposer(); break;
     case "exec": execute(id); break;
     case "answer": answerQuestion(id, b.dataset.choice); break;
+    case "voice-toggle": setVoiceMode(!S.voiceOn); break;
+    case "voice-try": { const f = draftOf(b.dataset.mode); if (f) speak({ id: f.id || f.pid || "preview", name: f.name, voice: f.voiceName ? { name: f.voiceName } : null }, `Hi! I'm ${f.name || "your new atom"}. ${f.responsibility ? "I'll keep an eye on things for you." : "Give me a job and I'll get to it."}`); break; }
+    case "speak-note": {
+      const r = S.runs.find(x => x.id === id); if (!r || !d) break;
+      if (S.speakingNote === id) { stopSpeaking(); break; }
+      S.speakingNote = id; renderAll();
+      speak(d, r.text).then(() => { if (S.speakingNote === id) { S.speakingNote = null; renderAll(); } });
+      break; }
+    case "mic": if (S.listening) stopListening(); else listen(text => { S.handsFree = true; sendReply(text); }); break;
     case "undo": undoAction(id); break;
     case "tell-pick": { const t = S.tell, dd = S.dots.find(x => x.id === id); S.tell = null; paintTell(); if (t && dd) deliver(dd, t.text); break; }
     case "tell-new": { const t = S.tell; S.tell = null; paintTell(); if (t) newDotFrom(t.text); break; }
@@ -137,7 +147,7 @@ document.addEventListener("input", ev => {
   if ((t as any).dataset?.edit && S.edits[(t as any).dataset.id]) S.edits[(t as any).dataset.id][(t as any).dataset.edit] = (t as any).type === "checkbox" ? (t as any).checked : (t as any).value;
   if ((t as any).dataset?.people) searchPeople((t as any).dataset.people, (t as any).value);
   if ((t as any).dataset?.repoq) { const mode = (t as any).dataset.repoq, f = draftOf(mode); if (f) { f.repoQ = (t as any).value; const l = $(`#${prefixOf(mode)}-rlist`); if (l) l.innerHTML = repoListHtml(f, mode); } }
-  if ((t as any).id === "reply") autosize(t);
+  if ((t as any).id === "reply") { autosize(t); dictationPaused(() => { S.handsFree = false; sendReply(); }); }
 });
 document.addEventListener("change", ev => {
   const t = ev.target, mode = (t as any).closest?.(".builder")?.dataset.draft, f = mode ? draftOf(mode) : null;
@@ -154,7 +164,7 @@ document.addEventListener("focusout", ev => {
 document.addEventListener("submit", ev => {
   ev.preventDefault();
   if ((ev.target as any).classList.contains("builder")) saveBuilder((ev.target as any).dataset.draft);
-  if ((ev.target as any).id === "composer") sendReply();
+  if ((ev.target as any).id === "composer") { cancelAutoSend(); S.handsFree = false; sendReply(); }
   if ((ev.target as any).id === "tell") { const inp = $("#tellIn"), v = inp?.value || ""; if (v.trim()) { inp.value = ""; tellDots(v); } }
 });
 document.addEventListener("paste", ev => { if ((ev.target as any).id !== "reply" || !S.imagesOK) return; const f = [...(ev.clipboardData?.files || [])].find(x => x.type.startsWith("image/")); if (f) { S.replyImage = f; paintComposer(); } });
@@ -162,7 +172,7 @@ document.addEventListener("keydown", ev => {
   const t = ev.target, typing = (t as any).closest?.("input,textarea,select,[contenteditable]");
   if ((t as any).id === "sh-ask" && ev.key === "Enter") { ev.preventDefault(); draftWithClaude(); return; }
   if ((t as any).dataset?.edit === "answer" && ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); answerQuestion((t as any).dataset.id, "own"); return; }
-  if ((t as any).id === "reply" && ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); sendReply(); return; }
+  if ((t as any).id === "reply" && ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); cancelAutoSend(); S.handsFree = false; sendReply(); return; }
   if (ev.key === "Escape") {
     if ((t as any).dataset?.people) { const l = $(`#${prefixOf((t as any).dataset.people)}-plist`); if (l) l.hidden = true; return; }
     if (S.sheet) { closeSheet(); return; }

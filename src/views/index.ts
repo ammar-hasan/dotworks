@@ -36,6 +36,7 @@ export function buildView() {
               <label class="icon-btn" id="attachLbl" title="Attach an image" hidden>${ICON.clip}<span class="sr">Attach an image</span><input type="file" id="replyImg" accept="image/*" hidden></label>
               <label class="sr" for="reply">Message your atom</label>
               <textarea id="reply" rows="1" placeholder="Message…"></textarea>
+              <button class="icon-btn mic" type="button" id="micBtn" data-act="mic" aria-label="Talk" aria-pressed="false" hidden>${ICON.mic}</button>
               <button class="send" type="submit" id="replySend" aria-label="Send">${ICON.send}</button>
             </div>
             <div class="reply-att" id="replyAtt"></div>

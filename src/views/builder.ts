@@ -10,14 +10,15 @@ import { closeAcct } from "../ui/account";
 import { avatarHtml, lookOf } from "../ui/characters";
 import { openDot } from "../ui/nav";
 import { renderAll } from "../ui/shell";
+import { canSpeak, voices } from "../features/voice";
 import { cantSave, recordAdopt, rememberNew } from "./seeds";
 
 /* ─── builder: make / change a dot ─── */
-export function draftFromDot(d) { return { id: d.id, name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
-export function blankDraft() { const hue = Math.floor(Math.random() * 360); return { name: "", responsibility: "", rulesText: "", sources: ["Google Calendar", "Gmail"].filter(n => appsAvail().includes(n)), cadence: "daily", tier: "default", hue, look: { shape: SHAPES[hue % 4], eyes: "round", acc: "none" }, vips: [], ask: "", repoMode: "none", repoList: [], rev: 0 }; }
+export function draftFromDot(d) { return { id: d.id, voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
+export function blankDraft() { const hue = Math.floor(Math.random() * 360); return { pid: newId("dot_"), voiceName: "", name: "", responsibility: "", rulesText: "", sources: ["Google Calendar", "Gmail"].filter(n => appsAvail().includes(n)), cadence: "daily", tier: "default", hue, look: { shape: SHAPES[hue % 4], eyes: "round", acc: "none" }, vips: [], ask: "", repoMode: "none", repoList: [], rev: 0 }; }
 export function openNew(seed) {
   if (cantSave()) return;
-  S.formDraft = seed ? { name: seed.name, responsibility: seed.responsibility, rulesText: seed.rules.join("\n"), sources: normSources(seed.sources), cadence: seed.cadence, tier: seed.tier, hue: seed.hue, look: { ...seed.look }, vips: [], seedKey: seed.key, repoMode: "none", repoList: [], rev: 0 } : blankDraft();
+  S.formDraft = seed ? { pid: newId("dot_"), voiceName: "", name: seed.name, responsibility: seed.responsibility, rulesText: seed.rules.join("\n"), sources: normSources(seed.sources), cadence: seed.cadence, tier: seed.tier, hue: seed.hue, look: { ...seed.look }, vips: [], seedKey: seed.key, repoMode: "none", repoList: [], rev: 0 } : blankDraft();
   S.formFile = null; S.sheet = { kind: seed ? "plant" : "new" }; closeAcct(false); renderSheet();
   setTimeout(() => (seed ? $("#sh-name") : $("#sh-ask") || $("#sh-name"))?.focus({ preventScroll: true }), 120);
 }
@@ -41,6 +42,7 @@ export function lookBlock(f, p) {
       <div class="pick"><span class="eyebrow">Eyes</span><div class="opts">${EYES.map(v => opt("eyes", v)).join("")}</div></div>
       <div class="pick"><span class="eyebrow">Wears</span><div class="opts">${ACCS.map(v => opt("acc", v)).join("")}</div></div>
       <div class="pick"><label class="eyebrow" for="${p}-hue">Colour</label><input type="range" id="${p}-hue" data-f="hue" min="0" max="359" value="${hueOf(f)}"></div>
+      ${canSpeak() && voices().length ? `<div class="pick"><label class="eyebrow" for="${p}-voice">Voice</label><div class="row voice-pick"><select id="${p}-voice" data-f="voiceName"><option value="">Its own (picked for it)</option>${voices().map(v => `<option value="${esc(v.name)}" ${f.voiceName === v.name ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select><button type="button" class="btn ghost sm" data-act="voice-try" data-mode="${p === "sh" ? "new" : "edit"}">${ICON.voice}Hear it</button></div></div>` : ""}
     </div>`;
 }
 export function builderHtml(f, mode) {
@@ -135,9 +137,9 @@ export async function saveBuilder(mode) {
   if (!sources.length) { err.textContent = "Let it read at least one app."; return; }
   if (!NS.db || !S.uid) { err.textContent = "Open this page inside Claude, signed in, to save atoms."; return; }
   const btn = $(`#${p}-save`); btn.disabled = true; err.textContent = "";
-  const prev = mode === "edit" ? S.dots.find(d => d.id === f.id) : null, id = prev ? prev.id : newId("dot_");
+  const prev = mode === "edit" ? S.dots.find(d => d.id === f.id) : null, id = prev ? prev.id : f.pid || newId("dot_");
   if (f.repoMode === "some" && !(f.repoList || []).length) { err.textContent = "Pick at least one repo, or choose None."; return; }
-  const fields = { repos: normRepos({ mode: f.repoMode, list: f.repoList }), name, responsibility: resp, rules, sources, cadence: CADENCE[f.cadence] ? f.cadence : "daily", tier: tierOf(f), hue: hueOf(f), look: lookOf({ id, look: f.look }), vips: (f.vips || []).slice(0, 5) };
+  const fields = { voice: f.voiceName ? { name: clean(f.voiceName).slice(0, 120) } : null, repos: normRepos({ mode: f.repoMode, list: f.repoList }), name, responsibility: resp, rules, sources, cadence: CADENCE[f.cadence] ? f.cadence : "daily", tier: tierOf(f), hue: hueOf(f), look: lookOf({ id, look: f.look }), vips: (f.vips || []).slice(0, 5) };
   let oldAsset = null, fileChanged = false;
   try {
     const file = mode === "new" ? S.formFile : S.editFile;

@@ -36,3 +36,6 @@ input[type=range]{width:100%;max-width:240px;accent-color:var(--ink-2)}
 .plist button:hover,.plist button:focus-visible{background:var(--hover)}
 .plist img{width:24px;height:24px;border-radius:50%}
 .plist small{color:var(--muted);font-size:12px}
+.voice-pick{gap:8px;flex-wrap:nowrap}
+.voice-pick select{min-width:0;flex:1}
+.voice-pick .btn{flex:none}
