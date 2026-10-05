@@ -1,7 +1,7 @@
 import { CADENCE, ICON, VERSION } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, esc, fmtWhen, hueOf, plural, reconcile, span } from "../core/helpers";
-import { NS, S, cloudOn, curDot, isDue, pending } from "../core/state";
+import { NS, S, cloudOn, curDot, hasJobs, isDue, jobsOf, pending } from "../core/state";
 import { cloudFiringFor, missingApps } from "../features/cloud";
 import { renderAcct } from "./account";
 import { avatarHtml, stateOf } from "./characters";
@@ -47,13 +47,25 @@ export function paintBanner() {
 }
 export function dotStatus(d) {
   if (S.running?.dotId === d.id) return [S.running.text ? "writing you a note…" : "awake now", "live"];
-  if (cloudFiringFor(d)) return ["waking in the cloud", "cl"];
+  if (cloudFiringFor(d)) return [hasJobs(d) ? "running in the cloud" : "waking in the cloud", "cl"];
   const asks = pending().filter(a => a.dotId === d.id).length;
+  if (hasJobs(d)) return jobsStatus(d, asks);
   if (cloudOn(d)) { const t = S.triggers?.get(d.cloud.triggerId); if (t && !t.enabled) return ["paused in the cloud", ""];
     if (t && missingApps(d, t).length) return ["cloud · apps not attached", "warn"]; return [t?.next ? "cloud · " + fmtWhen(Date.parse(t.next)).replace(/^today /, "") : "awake in the cloud", "cl"]; }
   if (asks) return [plural(asks, "ask") + " for you", ""];
   if (isDue(d)) return [d.lastRunAt ? "ready to wake" : "new · wake it", ""];
   return ["resting · next in " + span((d.lastRunAt || 0) + (CADENCE[d.cadence] || CADENCE.daily) - Date.now()), ""];
+}
+// an atom driven by jobs: what its jobs are up to
+function jobsStatus(d, asks) {
+  const jobs = jobsOf(d), on = jobs.filter(cloudOn), ts = on.map(j => S.triggers?.get(j.cloud.triggerId)).filter(Boolean);
+  if (!jobs.length) return ["no jobs yet", ""];
+  if (ts.some(t => missingApps(d, t).length)) return ["cloud · apps not attached", "warn"];
+  if (asks) return [plural(asks, "ask") + " for you", ""];
+  if (!on.length) return ["jobs not scheduled yet", "warn"];
+  if (ts.length && ts.every(t => !t.enabled)) return ["paused in the cloud", ""];
+  const next = ts.filter(t => t.enabled && t.next).map(t => Date.parse(t.next)).sort((a, b) => a - b)[0];
+  return [next ? "cloud · " + fmtWhen(next).replace(/^today /, "") : `${plural(on.length, "job")} in the cloud`, "cl"];
 }
 export function renderDotList(box, where) {
   if (!box) return;

@@ -36,6 +36,7 @@ To pick up new code or an app you've just connected, say **"update Atoms"** in t
 - **Asks** are tool calls in waiting: the card is built from the tool's own schema, you can edit every argument, and only *Approve* runs it. Afterwards a receipt says what changed, with an Undo where there's an exact way back.
 - **Questions**: when the right move depends on something only you know, an atom asks with a few answers to tap, and carries on as soon as you answer.
 - **One box on Home**: type what you want and it goes to the atom whose job fits, or offers to make one.
+- **Jobs**: an atom can run a command from your repos, like `/catchup`, as jobs: one per repo, each on its own schedule in the cloud. Whenever the command needs your say, it leaves plain-words questions in Asks ("Call with Sara on Tuesday · Add it / Skip"), and once you've answered a run's questions it carries on with what you said yes to. **Ketchup** on Elements is a ready-made one.
 - **Voice**: turn on voice on an atom's page and it reads its replies aloud in its own voice (your device's built-in voices; pick one in its settings). Any note has *Read aloud*. You talk back with your keyboard's mic, and in voice mode your message goes when you pause. Where the page may use the microphone, a mic button gives you a hands-free back and forth.
 
 ### Platform limits worth knowing
@@ -64,7 +65,7 @@ npm run manifest   # dist/capabilities.json from local/connectors.json
 | `src/core/` | State (`S`, `NS`), boot and store subscriptions, the app registry, helpers, diagnostics, presence, hot reload |
 | `src/ui/` | Shell, navigation, account popover, characters, and the one delegated event handler (`events.ts`) |
 | `src/views/` | Home, an atom (chat, activity, schedule, settings), elements, apps, the atom builder |
-| `src/features/` | Asks, questions, receipts and undo, the Home box, voice, cloud schedules, repos, deleting an atom |
+| `src/features/` | Asks, questions, receipts and undo, the Home box, voice, jobs, cloud schedules, repos, deleting an atom |
 | `src/ai/` | Waking an atom, tool schemas, the digest |
 | `src/styles/`, `src/page/` | CSS and the page markup |
 | `src/platform/` | Type definitions for Claude's artifact runtime |

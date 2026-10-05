@@ -5,7 +5,8 @@ import { refreshAssets } from "../core/boot";
 import { ACCS, CADENCE, EYES, ICON, SHAPES, TEXT_TYPES, TIERS } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clean, esc, handleOf, hueOf, newId, tierOf, toast, upsertLocal } from "../core/helpers";
-import { NS, S, userDoc } from "../core/state";
+import { NS, S, hasJobs, userDoc } from "../core/state";
+import { addJobs } from "../features/jobs";
 import { closeAcct } from "../ui/account";
 import { avatarHtml, lookOf } from "../ui/characters";
 import { openDot } from "../ui/nav";
@@ -14,11 +15,11 @@ import { canSpeak, voices } from "../features/voice";
 import { cantSave, recordAdopt, rememberNew } from "./seeds";
 
 /* ─── builder: make / change a dot ─── */
-export function draftFromDot(d) { return { id: d.id, voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
+export function draftFromDot(d) { return { id: d.id, jobbed: hasJobs(d), voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
 export function blankDraft() { const hue = Math.floor(Math.random() * 360); return { pid: newId("dot_"), voiceName: "", name: "", responsibility: "", rulesText: "", sources: ["Google Calendar", "Gmail"].filter(n => appsAvail().includes(n)), cadence: "daily", tier: "default", hue, look: { shape: SHAPES[hue % 4], eyes: "round", acc: "none" }, vips: [], ask: "", repoMode: "none", repoList: [], rev: 0 }; }
 export function openNew(seed) {
   if (cantSave()) return;
-  S.formDraft = seed ? { pid: newId("dot_"), voiceName: "", name: seed.name, responsibility: seed.responsibility, rulesText: seed.rules.join("\n"), sources: normSources(seed.sources), cadence: seed.cadence, tier: seed.tier, hue: seed.hue, look: { ...seed.look }, vips: [], seedKey: seed.key, repoMode: "none", repoList: [], rev: 0 } : blankDraft();
+  S.formDraft = seed ? { pid: newId("dot_"), voiceName: "", name: seed.name, responsibility: seed.responsibility, rulesText: seed.rules.join("\n"), sources: normSources(seed.sources), cadence: seed.cadence, tier: seed.tier, hue: seed.hue, look: { ...seed.look }, vips: [], seedKey: seed.key, job: seed.job || null, repoMode: seed.job ? "some" : "none", repoList: [], rev: 0 } : blankDraft();
   S.formFile = null; S.sheet = { kind: seed ? "plant" : "new" }; closeAcct(false); renderSheet();
   setTimeout(() => (seed ? $("#sh-name") : $("#sh-ask") || $("#sh-name"))?.focus({ preventScroll: true }), 120);
 }
@@ -58,7 +59,7 @@ export function builderHtml(f, mode) {
     <div class="field-i"><label class="eyebrow" for="${p}-rules">House rules · one per line</label><textarea id="${p}-rules" data-f="rulesText" maxlength="900" style="min-height:64px" placeholder="Never propose more than 3 actions">${esc(f.rulesText || "")}</textarea></div>
     <div class="field-i"><span class="eyebrow">It may read</span><div class="checks" id="${p}-srcs">${[...new Set([...appsAvail(), ...normSources(f.sources)])].map(n => `<label title="${esc(appInfo(n).does)}"><input type="checkbox" data-f="src" data-src="${esc(n)}" value="${esc(n)}" ${normSources(f.sources).includes(n) ? "checked" : ""}>${esc(shortOf(n))}${S.appsOff.has(n) ? " (off)" : S.connLoaded && NS.mcp && !S.conn[n] ? " (not connected)" : ""}</label>`).join("") || '<span class="fine">No apps are on. Turn some on in Apps.</span>'}</div></div>
     <div class="field-i" id="${p}-repoField">${repoFieldHtml(f, mode)}</div>
-    <div class="two"><div class="field-i"><label class="eyebrow" for="${p}-cad">Wakes</label><select id="${p}-cad" data-f="cadence">${["hourly", "daily", "weekly"].map(c => `<option ${f.cadence === c ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+    <div class="two">${f.job || f.jobbed ? `<div class="field-i"><span class="eyebrow">Runs</span><p class="note" style="padding:10px 0 0">On each job's own schedule, in the cloud.</p></div>` : `<div class="field-i"><label class="eyebrow" for="${p}-cad">Wakes</label><select id="${p}-cad" data-f="cadence">${["hourly", "daily", "weekly"].map(c => `<option ${f.cadence === c ? "selected" : ""}>${c}</option>`).join("")}</select></div>`}
       <div class="field-i"><label class="eyebrow" for="${p}-tier">Mind</label><select id="${p}-tier" data-f="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}" ${tierOf(f) === k ? "selected" : ""}>${v}${k === "complex" ? " · slower" : k === "quick" ? " · lightest" : ""}</option>`).join("")}</select></div></div>
     ${NS.user ? `<div class="field-i"><label class="eyebrow" for="${p}-people">People who matter · optional</label><div class="people-pick"><div class="people" id="${p}-vips"></div><input type="text" id="${p}-people" data-people="${mode}" placeholder="Search your organization" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="${p}-plist" aria-autocomplete="list"><div class="plist" id="${p}-plist" role="listbox" hidden></div></div><span class="note">Their mail comes first. Only their ids are saved.</span></div>` : ""}
     ${NS.assets ? `<div class="field-i"><label class="eyebrow" for="${p}-file">Something it should know · optional</label><input type="file" id="${p}-file" data-file="${mode}" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json"><span class="note" id="${p}-fileNote">${f.notesName ? `Knows <b>${esc(f.notesName)}</b> now. Pick another file to replace it, or <button type="button" class="link" data-act="drop-file" data-id="${mode}">remove it</button>.` : "A .txt, .md, .csv or .json it rereads every time, like your team roster."}</span></div>` : ""}
@@ -73,6 +74,14 @@ export function repoListHtml(f, mode) {
 }
 export function repoFieldHtml(f, mode) {
   const p = prefixOf(mode), m = f.repoMode || "none", list = f.repoList || [];
+  // an atom driven by jobs: the repos it works in are its jobs
+  if (f.jobbed) return `<span class="eyebrow">Repos</span><p class="note">Each of its jobs works in one repo. <button type="button" class="link" data-act="tab" data-id="schedule">See its jobs</button></p>`;
+  if (f.job) {
+    if (!S.repos && !S.reposLoading && !S.reposErr) setTimeout(() => loadRepos(), 0);
+    return `<span class="eyebrow">Repos it works in · each gets its own job</span><div class="people">${list.map(x => `<span class="person repo-chip"><span>${esc(x)}</span><button type="button" data-act="unpick-repo" data-id="${esc(x)}" data-mode="${mode}" aria-label="Remove ${esc(x)}">×</button></span>`).join("")}</div>
+      <input type="text" id="${p}-repoq" data-repoq="${mode}" value="${esc(f.repoQ || "")}" placeholder="Search your repos" autocomplete="off"><div class="repo-list" id="${p}-rlist">${repoListHtml(f, mode)}</div>
+      <span class="note">In each repo it runs ${esc(f.job.run)} in the cloud, on that job's own schedule, under the repo's own rules. Anything that needs your say comes to Asks first.</span>`;
+  }
   const chip = (v, l) => `<button type="button" class="chip" data-act="repo-mode" data-id="${v}" data-mode="${mode}" aria-pressed="${m === v}">${l}</button>`;
   let body = "";
   if (m === "some") {
@@ -138,8 +147,13 @@ export async function saveBuilder(mode) {
   if (!NS.db || !S.uid) { err.textContent = "Open this page inside Claude, signed in, to save atoms."; return; }
   const btn = $(`#${p}-save`); btn.disabled = true; err.textContent = "";
   const prev = mode === "edit" ? S.dots.find(d => d.id === f.id) : null, id = prev ? prev.id : f.pid || newId("dot_");
-  if (f.repoMode === "some" && !(f.repoList || []).length) { err.textContent = "Pick at least one repo, or choose None."; return; }
-  const fields = { voice: f.voiceName ? { name: clean(f.voiceName).slice(0, 120) } : null, repos: normRepos({ mode: f.repoMode, list: f.repoList }), name, responsibility: resp, rules, sources, cadence: CADENCE[f.cadence] ? f.cadence : "daily", tier: tierOf(f), hue: hueOf(f), look: lookOf({ id, look: f.look }), vips: (f.vips || []).slice(0, 5) };
+  const jobSpec = !prev && f.job ? f.job : null;
+  if (jobSpec && !(f.repoList || []).length) { err.textContent = "Pick at least one repo for it to work in."; btn.disabled = false; return; }
+  if (!jobSpec && !f.jobbed && f.repoMode === "some" && !(f.repoList || []).length) { err.textContent = "Pick at least one repo, or choose None."; btn.disabled = false; return; }
+  const fields: Record<string, any> = { voice: f.voiceName ? { name: clean(f.voiceName).slice(0, 120) } : null, repos: normRepos({ mode: f.repoMode, list: f.repoList }), name, responsibility: resp, rules, sources, cadence: CADENCE[f.cadence] ? f.cadence : "daily", tier: tierOf(f), hue: hueOf(f), look: lookOf({ id, look: f.look }), vips: (f.vips || []).slice(0, 5) };
+  // an atom driven by jobs keeps its repos on its jobs
+  if (jobSpec) { fields.repos = { mode: "none", list: [] }; fields.jobs = { run: jobSpec.run }; }
+  if (prev && hasJobs(prev)) delete fields.repos;
   let oldAsset = null, fileChanged = false;
   try {
     const file = mode === "new" ? S.formFile : S.editFile;
@@ -150,11 +164,16 @@ export async function saveBuilder(mode) {
       const up = await NS.assets.upload(file, { type }); oldAsset = prev?.notesAssetId || null; (fields as any).notesAssetId = up.id; (fields as any).notesName = clean(file.name).slice(0, 60); fileChanged = true;
     } else if (f.dropFile && prev?.notesAssetId) { oldAsset = prev.notesAssetId; (fields as any).notesAssetId = null; (fields as any).notesName = null; fileChanged = true; }
     if (prev) { await userDoc(id).update(fields); upsertLocal(S.dots, id, fields); }
-    else { const body = { type: "dot", ...fields, notesAssetId: (fields as any).notesAssetId || null, notesName: (fields as any).notesName || null, createdAt: Date.now(), lastRunAt: null, lastStatus: null }; await userDoc(id).set(body); rememberNew(id, body); }
+    else {
+      const body = { type: "dot", ...fields, notesAssetId: (fields as any).notesAssetId || null, notesName: (fields as any).notesName || null, createdAt: Date.now(), lastRunAt: null, lastStatus: null };
+      await userDoc(id).set(body); rememberNew(id, body);
+      if (jobSpec) await addJobs({ id, ...body }, f.repoList || [], jobSpec.run);
+    }
     if (oldAsset && oldAsset !== (fields as any).notesAssetId) NS.assets?.delete(oldAsset).catch(() => {});
     if (f.seedKey) recordAdopt(f.seedKey);
     if (fileChanged) refreshAssets();
-    if (mode === "new") { closeSheet(); openDot(id, "chat"); toast(`${name} is ready`, { label: "Wake it", fn: () => runDot(id) }); }
+    if (mode === "new" && jobSpec) { closeSheet(); openDot(id, "schedule"); toast(`${name} is ready. Give each job a schedule.`); }
+    else if (mode === "new") { closeSheet(); openDot(id, "chat"); toast(`${name} is ready`, { label: "Wake it", fn: () => runDot(id) }); }
     else { S.editDraft = null; S.editFile = null; S.settingsKey = ""; toast("Saved"); renderAll(); }
   } catch (e) {
     diag("db.save", e);

@@ -5,7 +5,7 @@ import { SRV } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, clone } from "../core/helpers";
 import { setPresence } from "../core/room";
-import { NS, S, cloudOn, connPerm, runsCol } from "../core/state";
+import { NS, S, awake, connPerm, jobsOf, runsCol } from "../core/state";
 import { loadTriggers } from "../features/cloud";
 import { closeAcct } from "./account";
 import { renderAll } from "./shell";
@@ -40,7 +40,7 @@ export function openDot(id, tab?) {
       if (!S.pruned.has(id)) { S.pruned.add(id); setTimeout(() => pruneRuns(id), 5000); }
     }
     const d = S.dots.find(x => x.id === id);
-    if (d && (cloudOn(d) || d.cloudPending) && NS.mcp && !S.triggers && connPerm(SRV.cloud) === "granted") loadTriggers();
+    if (d && (awake(d) || d.cloudPending || jobsOf(d).some(j => j.cloudPending)) && NS.mcp && !S.triggers && connPerm(SRV.cloud) === "granted") loadTriggers();
   }
   closeAcct(false); setPresence(); renderAll();
 }

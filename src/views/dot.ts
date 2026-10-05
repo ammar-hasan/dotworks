@@ -2,8 +2,9 @@ import { normSources, shortOf } from "../core/apps";
 import { reposLine } from "../features/repos";
 import { ICON, TIERS } from "../core/constants";
 import { $, ago, dayLabel, esc, fmtTime, fmtWhen, handleOf, headlineOf, hueOf, md, plural, reconcile } from "../core/helpers";
-import { NS, S, cloudOn, curDot, isNarrow, pending, sendOK } from "../core/state";
+import { NS, S, awake, cloudOn, curDot, hasJobs, isNarrow, jobsOf, pending, sendOK } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
+import { decisionsHtml, decisionsSig, groupKey, groupOf, isDecision, jobTitle } from "../features/jobs";
 import { receiptHtml } from "../features/receipts";
 import { canListen, canSpeak } from "../features/voice";
 import { appsMissingFor, cloudFiringFor, paintCloud } from "../features/cloud";
@@ -14,26 +15,29 @@ import { builderHtml, draftFromDot, paintPeoplePicker } from "./builder";
 /* ─── dot view ─── */
 export function paintDot() {
   const d = curDot(); if (!d || !$("#dvName")) return;
-  const live = S.running?.dotId === d.id, cloud = cloudOn(d), [st, cl] = dotStatus(d);
+  const live = S.running?.dotId === d.id, cloud = awake(d), [st, cl] = dotStatus(d), jobbed = hasJobs(d), jobs = jobsOf(d);
   const avh = avatarHtml(d, { size: isNarrow() ? 40 : 56, state: stateOf(d) });
   const avb = $("#dvAv"); if (avb.dataset.sig !== avh) { avb.innerHTML = avh; avb.dataset.sig = avh; }
   $("#dvName").textContent = d.name;
   const srcs = normSources(d.sources).map(shortOf).join(" + ") || "nothing yet";
-  const rl = reposLine(d);
-  const meta = `<span class="hd">${esc(handleOf(d))}</span><span class="${cl}">${esc(st)}</span><span class="rd">reads ${esc(srcs)}</span>${rl ? `<span class="rd">repos ${esc(rl)}</span>` : ""}`;
+  const rl = jobbed ? (jobs.length > 2 ? `${jobTitle(jobs[0])} +${jobs.length - 1}` : jobs.map(jobTitle).join(" + ")) : reposLine(d);
+  const meta = `<span class="hd">${esc(handleOf(d))}</span><span class="${cl}">${esc(st)}</span><span class="rd">reads ${esc(srcs)}</span>${rl ? `<span class="rd">${jobbed ? "jobs" : "repos"} ${esc(rl)}</span>` : ""}`;
   if ($("#dvMeta").innerHTML !== meta) $("#dvMeta").innerHTML = meta;
-  const canRun = !!NS.sample && !S.running && (S.perms as any).sample !== "denied";
-  const act = `${live ? `<button class="btn" data-act="stop" aria-label="Stop">${ICON.stop}<span class="lbl">Stop</span></button>` : `<button class="btn pri" data-act="run" aria-label="Wake" ${canRun ? "" : "disabled"} title="${NS.sample ? "Wake it for a check-in (W)" : "Waking needs Claude in this view"}">${ICON.bolt}<span class="lbl">Wake</span></button>`}
+  // an atom driven by jobs runs them in the cloud; the others wake here with Claude
+  const canRun = jobbed ? !!NS.mcp : !!NS.sample && !S.running && (S.perms as any).sample !== "denied";
+  const runTitle = jobbed ? "Run its jobs now, in the cloud (W)" : NS.sample ? "Wake it for a check-in (W)" : "Waking needs Claude in this view";
+  const act = `${live ? `<button class="btn" data-act="stop" aria-label="Stop">${ICON.stop}<span class="lbl">Stop</span></button>` : `<button class="btn pri" data-act="run" aria-label="${jobbed ? "Run now" : "Wake"}" ${canRun ? "" : "disabled"} title="${runTitle}">${ICON.bolt}<span class="lbl">${jobbed ? "Run now" : "Wake"}</span></button>`}
     <details class="menu" id="dvMenu"><summary class="icon-btn" aria-label="More">${ICON.more}</summary><div class="menu-list">
       ${NS.db && S.canShare !== false ? `<button data-act="share">Share as an element</button>` : ""}
       ${NS.downloads && S.runs[0]?.text ? `<button data-act="export" data-id="${esc(S.runs[0].id)}">Save latest note (.md)</button>` : ""}
       <button data-act="tab" data-id="settings">Change its look or job</button>
+      ${jobbed ? `<button data-act="tab" data-id="schedule">Its jobs and schedules</button>` : ""}
       <button class="danger" data-act="delete-dot">Delete…</button></div></details>`;
   const actBox = $("#dvAct"), wasOpen = !!$("#dvMenu")?.open;
   if (actBox.dataset.sig !== act) { actBox.innerHTML = act; actBox.dataset.sig = act; if (wasOpen) $("#dvMenu").open = true; }
-  $("#dvConfirm").innerHTML = S.confirmDel ? `<span>Delete ${esc(d.name)}, its notes${cloud ? " and its cloud schedule" : ""}?</span><button class="btn danger sm" data-act="confirm-del">Delete</button><button class="btn ghost sm" data-act="cancel-del">Keep it</button>` : "";
+  $("#dvConfirm").innerHTML = S.confirmDel ? `<span>Delete ${esc(d.name)}, its notes${jobs.length ? `, its ${plural(jobs.length, "job")}` : ""}${cloud ? ` and ${jobs.length ? "their" : "its"} cloud schedule${jobs.filter(cloudOn).length > 1 ? "s" : ""}` : ""}?</span><button class="btn danger sm" data-act="confirm-del">Delete</button><button class="btn ghost sm" data-act="cancel-del">Keep it</button>` : "";
   const asks = pending().filter(a => a.dotId === d.id).length;
-  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ["activity", "Activity", ""], ["schedule", "Schedule", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
+  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ["activity", "Activity", ""], ["schedule", jobbed ? "Jobs" : "Schedule", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
   const th = tabs.map(([k, l, extra]) => `<button role="tab" id="tab-${k}" data-tab="${k}" aria-controls="tp-${k}" aria-selected="${S.tab === k}" tabindex="${S.tab === k ? 0 : -1}">${l}${extra}</button>`).join("");
   if ($("#dvTabs").innerHTML !== th) $("#dvTabs").innerHTML = th;
   for (const k of ["chat", "activity", "schedule", "settings"]) $("#tp-" + k).hidden = S.tab !== k;
@@ -57,7 +61,9 @@ export function noteBlock(r, d) {
     NS.downloads && r.text ? `<button class="btn ghost sm" data-act="export" data-id="${esc(r.id)}">Save .md</button>` : "",
     NS.comments && !S.commentsOff ? `<button class="btn ghost sm" data-act="comment">Comment</button>` : "",
   ].join("");
-  return `<div class="msg dot" data-key="note:${esc(r.id)}" data-comment-target><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${esc(fmtTime(r.startedAt))} · ${r.source === "cloud" ? '<span class="cloud-tag">woke in the cloud</span>' : "woke here"}${esc(tierNote)}</div>${steps}${r.text ? `<div class="letter">${md(r.text)}</div>` : ""}${status}${acts ? `<div class="m-acts">${acts}</div>` : ""}</div></div>`;
+  // a note from one of its jobs says which one
+  const job = r.jobId ? S.jobs.find(j => j.id === r.jobId) : null, jobTag = r.jobId ? `<span class="job-tag">${esc(job ? jobTitle(job) : "a job")}</span> · ` : "";
+  return `<div class="msg dot" data-key="note:${esc(r.id)}" data-comment-target><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${jobTag}${esc(fmtTime(r.startedAt))} · ${r.source === "cloud" ? `<span class="cloud-tag">${r.jobId ? "ran in the cloud" : "woke in the cloud"}</span>` : "woke here"}${esc(tierNote)}</div>${steps}${r.text ? `<div class="letter">${md(r.text)}</div>` : ""}${status}${acts ? `<div class="m-acts">${acts}</div>` : ""}</div></div>`;
 }
 export function paintChat() {
   const box = $("#msgs"), d = curDot(); if (!box || !d) return;
@@ -66,10 +72,11 @@ export function paintChat() {
   if (!S.runsLoaded) blocks.push({ key: "loading", html: `<div data-key="loading" class="col"><div class="skel" style="width:40%"></div><div class="skel" style="height:90px"></div></div>`, sig: "l" });
   const runs = S.runs.slice().reverse(), myActs = S.actions.filter(a => a.dotId === d.id);
   if (S.runsLoaded && !runs.length && !S.running) {
-    blocks.push({ key: "intro", sig: "i" + d.name + d.responsibility + hueOf(d) + JSON.stringify(lookOf(d)), html: `<div class="msg dot" data-key="intro"><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${esc(handleOf(d))}</div><div class="intro-card">Hi, I'm ${esc(d.name)}. My job: ${esc(d.responsibility)} <br><br>Wake me for a check-in, or just ask me something.</div></div></div>` });
+    const how = hasJobs(d) ? `My jobs are on the Jobs tab: give each a schedule and I'll run ${esc(d.jobs?.run || "them")} there in the cloud. Anything that needs your say comes to Asks first.` : "Wake me for a check-in, or just ask me something.";
+    blocks.push({ key: "intro", sig: "i" + d.name + d.responsibility + hueOf(d) + JSON.stringify(lookOf(d)) + how, html: `<div class="msg dot" data-key="intro"><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${esc(handleOf(d))}</div><div class="intro-card">Hi, I'm ${esc(d.name)}. My job: ${esc(d.responsibility)} <br><br>${how}</div></div></div>` });
   }
   let lastDay = "";
-  const shown = new Set();
+  const shown = new Set<string>();
   for (const r of runs) {
     const dl = dayLabel(r.startedAt);
     if (dl !== lastDay) { lastDay = dl; blocks.push({ key: "day:" + dl, html: `<div class="daysep" data-key="day:${esc(dl)}">${esc(dl)}</div>`, sig: dl }); }
@@ -80,10 +87,11 @@ export function paintChat() {
     ].sort((x, y) => x.at - y.at);
     for (const it of items) {
       if (it.kind === "turn") { if (it.t.kind !== "answer") blocks.push(turnBlock(it.t, `t:${r.id}:${it.i}`, d)); }
+      else if (isDecision(it.a)) { if (!shown.has(it.a.id)) blocks.push(decisionBlock(it.a, shown)); }
       else { shown.add(it.a.id); blocks.push(askBlock(it.a)); }
     }
   }
-  for (const a of myActs.filter(a => a.state === "pending" && !shown.has(a.id)).reverse()) blocks.push(askBlock(a));
+  for (const a of myActs.filter(a => a.state === "pending" && !shown.has(a.id)).reverse()) blocks.push(isDecision(a) ? decisionBlock(a, shown) : askBlock(a));
   if (S.running?.dotId === d.id) {
     const lv = S.running;
     blocks.push({ key: "live", sig: JSON.stringify([lv.steps, lv.text]), html: `<div class="msg dot" data-key="live"><span class="m-av">${avatarHtml(d, { size: 30, state: stateOf(d) })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · awake now</div>${threadHtml(lv.steps)}${lv.text ? `<div class="letter">${md(lv.text)}</div>` : `<div class="typing"><i></i><i></i><i></i><span>${lv.steps.length ? "putting the note together" : "waking up — the first time, Claude asks you to allow it and the apps it reads"}</span></div>`}</div></div>` });
@@ -104,6 +112,11 @@ export function turnBlock(t, key, d) {
     ? `<div class="msg dot" data-key="${esc(key)}"><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body">${t.steps?.length ? threadHtml(t.steps) : ""}<div class="letter sm">${md(t.text)}</div><span class="when">${esc(fmtTime(t.at))}</span></div></div>`
     : `<div class="msg you" data-key="${esc(key)}"><div class="bubble">${esc(t.text)}</div>${t.image ? `<span class="img-tag">image · ${esc(t.image)}</span>` : ""}<span class="when">${esc(fmtTime(t.at))}</span></div>`;
   return { key, html, sig: html };
+}
+// a job's decisions from one run: one short list, answered rows included
+export function decisionBlock(a, shown: Set<string>) {
+  const grp = groupOf(a); for (const x of grp) shown.add(x.id);
+  return { key: "grp:" + groupKey(a), sig: decisionsSig(grp), html: `<div class="msg ask-row" data-key="grp:${esc(groupKey(a))}"><span class="m-av"></span><div class="m-body">${decisionsHtml(grp, { inChat: true })}</div></div>` };
 }
 export function askBlock(a) {
   if (a.state === "pending") return { key: "ask:" + a.id, sig: askSig(a), html: `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body">${askHtml(a, { inChat: true })}</div></div>` };
@@ -137,7 +150,7 @@ export function paintComposer() {
     : src.includes("Gmail") ? ["Anything urgent?", "Is anything urgent in my inbox?"] : null;
   const voiceChip = can && canSpeak() ? `<button type="button" class="chip voice-chip" data-act="voice-toggle" aria-pressed="${!!S.voiceOn}" title="${S.voiceOn ? "Voice on: replies are read aloud" : "Turn on voice: replies are read aloud"}">${ICON.voice}Voice${S.voiceOn ? " on" : ""}</button>` : "";
   const chips = live ? `<button type="button" class="chip" data-act="stop">${ICON.stop}Stop waking</button>`
-    : can && !busy ? `<button type="button" class="chip" data-act="run" ${S.running ? "disabled" : ""}>${ICON.bolt}Wake now</button>${q && S.runsLoaded ? `<button type="button" class="chip" data-act="suggest" data-id="${esc(q[1])}">${esc(q[0])}</button>` : ""}${voiceChip}` : voiceChip;
+    : can && !busy ? `<button type="button" class="chip" data-act="run" ${S.running || (hasJobs(d) && !NS.mcp) ? "disabled" : ""}>${ICON.bolt}${hasJobs(d) ? "Run its jobs" : "Wake now"}</button>${q && S.runsLoaded ? `<button type="button" class="chip" data-act="suggest" data-id="${esc(q[1])}">${esc(q[0])}</button>` : ""}${voiceChip}` : voiceChip;
   const cb = $("#cmpChips"); if (cb.innerHTML !== chips) cb.innerHTML = chips;
   const att = $("#replyAtt");
   if (S.replyImage) {

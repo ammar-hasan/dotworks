@@ -6,7 +6,7 @@ import { NS, S, userDoc } from "../core/state";
 import { avatarHtml, lookOf } from "../ui/characters";
 import { go, openDot } from "../ui/nav";
 import { renderAll } from "../ui/shell";
-import { closeSheet } from "./builder";
+import { closeSheet, openNew } from "./builder";
 
 /* ─── seeds ─── */
 export let seedTok = 0;
@@ -22,7 +22,7 @@ export async function paintSeeds() {
   reconcile(box, S.seeds.slice(0, 30).map(s => {
     const who = s.starter ? "starter" : s.owner === S.uid ? "shared by you" : "shared by " + (ps[s.owner]?.name || "someone");
     const n = S.adopts[s.key] || 0, mine = S.myAdopts.includes(s.key), canRemove = !s.starter && (s.owner === S.uid || S.isOwner);
-    const html = `<article class="seedcard" data-key="${esc(s.key)}" style="--h:${s.hue}" data-comment-target><div class="sc-top">${avatarHtml({ ...s, id: s.key }, { size: 56 })}<div style="min-width:0"><strong>${esc(s.name)}</strong><span class="by">${esc(who)}${n ? ` · added by ${n}` : ""}${mine ? " · you have it" : ""}</span></div></div><p>${esc(s.responsibility)}</p><div class="srcs">${normSources(s.sources).map(x => `<span class="src">${esc(shortOf(x))}</span>`).join("")}<span class="src">wakes ${esc(s.cadence)}</span></div><div class="row">${S.uid ? `<button class="btn pri sm" data-act="plant" data-id="${esc(s.key)}" ${S.busy["plant:" + s.key] ? "disabled" : ""}>${S.busy["plant:" + s.key] ? "Adding…" : "Add"}</button><button class="btn ghost sm" data-act="plant-open" data-id="${esc(s.key)}">Customize</button>` : ""}${canRemove ? `<span class="grow"></span><button class="btn ghost sm danger" data-act="unshare" data-id="${esc(s.key)}">Remove</button>` : ""}</div></article>`;
+    const html = `<article class="seedcard" data-key="${esc(s.key)}" style="--h:${s.hue}" data-comment-target><div class="sc-top">${avatarHtml({ ...s, id: s.key }, { size: 56 })}<div style="min-width:0"><strong>${esc(s.name)}</strong><span class="by">${esc(who)}${n ? ` · added by ${n}` : ""}${mine ? " · you have it" : ""}</span></div></div><p>${esc(s.responsibility)}</p><div class="srcs">${normSources(s.sources).map(x => `<span class="src">${esc(shortOf(x))}</span>`).join("")}<span class="src">${s.job ? `runs ${esc(s.job.run)} per repo` : `wakes ${esc(s.cadence)}`}</span></div><div class="row">${S.uid ? `<button class="btn pri sm" data-act="plant" data-id="${esc(s.key)}" ${S.busy["plant:" + s.key] ? "disabled" : ""}>${S.busy["plant:" + s.key] ? "Adding…" : s.job ? "Add…" : "Add"}</button><button class="btn ghost sm" data-act="plant-open" data-id="${esc(s.key)}">Customize</button>` : ""}${canRemove ? `<span class="grow"></span><button class="btn ghost sm danger" data-act="unshare" data-id="${esc(s.key)}">Remove</button>` : ""}</div></article>`;
     return { key: s.key, html, sig: html };
   }));
 }
@@ -44,6 +44,8 @@ export function cantSave() {
 }
 export async function plant(key) {
   const s = seedByKey(key); if (!s || cantSave() || S.busy["plant:" + key]) return;
+  // an atom with jobs needs its repos first: open it to pick them
+  if (s.job) { openNew(s); return; }
   const id = newId("dot_"), body = { type: "dot", name: s.name, responsibility: s.responsibility, rules: s.rules, sources: s.sources, cadence: s.cadence, tier: s.tier, hue: s.hue, look: s.look, vips: [], createdAt: Date.now(), lastRunAt: null, lastStatus: null };
   S.busy["plant:" + key] = true; renderAll();
   try {
@@ -56,13 +58,14 @@ export async function plant(key) {
 export async function shareSeed(d) {
   if (!d || !NS.db || !S.uid) return;
   const mine = S.seeds.filter(s => s.owner === S.uid);
-  const strip = s => ({ id: s.id, name: s.name, responsibility: s.responsibility, rules: s.rules, sources: s.sources, cadence: s.cadence, tier: s.tier, hue: s.hue, look: s.look, createdAt: s.createdAt });
-  const tpl = { id: "t" + d.id.slice(4), name: d.name, responsibility: d.responsibility, rules: d.rules || [], sources: d.sources || [], cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), createdAt: Date.now() };
+  const strip = s => ({ id: s.id, name: s.name, responsibility: s.responsibility, rules: s.rules, sources: s.sources, cadence: s.cadence, tier: s.tier, hue: s.hue, look: s.look, createdAt: s.createdAt, ...(s.job ? { job: s.job } : {}) });
+  // shared: the setup only. An atom with jobs shares what its jobs run, never your repos or their instructions.
+  const tpl = { id: "t" + d.id.slice(4), name: d.name, responsibility: d.responsibility, rules: d.rules || [], sources: d.sources || [], cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), createdAt: Date.now(), ...(d.jobs?.run ? { job: { run: d.jobs.run } } : {}) };
   try { await NS.db.doc("library/" + S.uid).set({ templates: [tpl, ...mine.filter(s => s.id !== tpl.id).map(strip)].slice(0, 12), updatedAt: Date.now() }); toast("Shared as an element. Only the setup is shared — never your notes, people or files.", { label: "See seeds", fn: () => go("seeds") }); }
   catch (e) { diag("db.share", e); toast("Sharing needs Contributor access to this page."); }
 }
 export async function unshare(key) {
   const s = seedByKey(key); if (!s || !s.owner) return;
-  const rest = S.seeds.filter(x => x.owner === s.owner && x.key !== key).map(x => ({ id: x.id, name: x.name, responsibility: x.responsibility, rules: x.rules, sources: x.sources, cadence: x.cadence, tier: x.tier, hue: x.hue, look: x.look, createdAt: x.createdAt }));
+  const rest = S.seeds.filter(x => x.owner === s.owner && x.key !== key).map(x => ({ id: x.id, name: x.name, responsibility: x.responsibility, rules: x.rules, sources: x.sources, cadence: x.cadence, tier: x.tier, hue: x.hue, look: x.look, createdAt: x.createdAt, ...(x.job ? { job: x.job } : {}) }));
   try { await NS.db.doc("library/" + s.owner).set({ templates: rest, updatedAt: Date.now() }); toast("Removed"); } catch (e) { diag("db.unshare", e); toast("Couldn't remove it."); }
 }

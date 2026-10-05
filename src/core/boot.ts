@@ -7,6 +7,7 @@ import { restoreHot } from "./hot";
 import { setPresence, startRoom } from "./room";
 import { NS, S, cloudOn, connPerm, runsCol, userDoc } from "./state";
 import { loadTriggers, paintCloud } from "../features/cloud";
+import { jobSpecOf } from "../features/jobs";
 import { renderAcct } from "../ui/account";
 import { lookOf } from "../ui/characters";
 import { go, openDot } from "../ui/nav";
@@ -101,6 +102,11 @@ export function subscribe() {
     loadLatest(); renderAll();
     if (S.dots.some(d => cloudOn(d) || d.cloudPending) && connPerm(SRV.cloud) === "granted" && !S.triggers) loadTriggers();
   }, e => { diag("db.dots", e); S.dotsLoaded = true; renderAll(); });
+  col.where("type", "==", "job").onSnapshot(snap => {
+    S.jobs = snap.docs.map(x => ({ id: x.id, ...clone(x.data()) })).filter(j => typeof j.dotId === "string");
+    S.jobsLoaded = true; renderAll();
+    if (S.jobs.some(j => cloudOn(j) || j.cloudPending) && connPerm(SRV.cloud) === "granted" && !S.triggers) loadTriggers();
+  }, e => { diag("db.jobs", e); S.jobsLoaded = true; renderAll(); });
   col.where("type", "==", "action").onSnapshot(snap => {
     S.actions = snap.docs.map(x => ({ id: x.id, ...clone(x.data()) })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     renderAll(); setPresence();
@@ -111,7 +117,7 @@ export function sanitizeSeed(t) {
   return { id: clean(t.id).slice(0, 40), name: clean(t.name).slice(0, 40), responsibility: clean(t.responsibility).slice(0, 900),
     rules: (Array.isArray(t.rules) ? t.rules : []).map(r => clean(r).slice(0, 160)).filter(Boolean).slice(0, 6),
     sources: normSources(t.sources), cadence: CADENCE[t.cadence] ? t.cadence : "daily",
-    tier: tierOf(t), hue: hueOf(t), look: lookOf(t), createdAt: Number(t.createdAt) || 0 };
+    tier: tierOf(t), hue: hueOf(t), look: lookOf(t), createdAt: Number(t.createdAt) || 0, job: jobSpecOf(t.job) };
 }
 export async function loadLatest() {
   if (!NS.db || !S.uid) return;

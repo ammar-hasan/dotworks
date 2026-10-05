@@ -1,6 +1,6 @@
 import { ACCS, ACC_SVG, EYES, SHAPES } from "../core/constants";
 import { hashStr, hueOf } from "../core/helpers";
-import { S, cloudOn, isDue } from "../core/state";
+import { S, awake, isDue } from "../core/state";
 import { cloudFiringFor } from "../features/cloud";
 
 /* ═════════ characters ═════════ */
@@ -22,7 +22,7 @@ export function stateOf(d) {
   if (running || chatting) c.push("live");
   if ((running && S.running.text) || (chatting && S.chat.text)) c.push("talk");
   if (S.speaking === d.id) c.push("live", "talk");
-  if (cloudOn(d)) c.push("cloud");
+  if (awake(d)) c.push("cloud");
   if (!running && !chatting && !isDue(d) && !cloudFiringFor(d)) c.push("rest");
   // a little hop right after you approve or answer something it asked
   if (S.cheer?.[d.id] && Date.now() - S.cheer[d.id] < 1500) c.push("cheer");

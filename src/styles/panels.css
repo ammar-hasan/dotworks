@@ -27,3 +27,24 @@
 .pickers select{width:auto}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink-2)}
 @media (max-width:520px){.cloud-card{flex-direction:column}}
+
+/* jobs: one card per job on an atom's Jobs tab, each with its own schedule */
+.jobs-box:empty{display:none}
+.jobs-box{display:flex;flex-direction:column;gap:16px}
+.jobs-h{display:flex;flex-direction:column;gap:6px}
+.jobs-h h3{font:700 19px/1.25 var(--f-ui);letter-spacing:-.015em}
+.jobs{display:flex;flex-direction:column;gap:18px}
+.jobcard{display:flex;flex-direction:column;gap:10px}
+.job-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:15px;color:var(--ink-2)}
+.job-h b{font-weight:650;color:var(--ink)}
+.job-h b:first-child{font:500 14px var(--f-mono)}
+.job-h .mono{font-size:12px;color:var(--muted);margin-left:2px}
+.job-more{border:1px solid var(--line);border-radius:14px;padding:10px 14px;background:var(--panel)}
+.job-more summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);list-style:none}
+.job-more summary::-webkit-details-marker{display:none}
+.job-more summary::before{content:"▸ ";color:var(--muted)}
+.job-more[open] summary::before{content:"▾ "}
+.job-more[open]{display:flex;flex-direction:column;gap:10px}
+.job-more textarea{min-height:120px;font:400 13px/1.5 var(--f-mono)}
+.job-add{gap:10px}
+.job-tag{color:var(--ink-2)}

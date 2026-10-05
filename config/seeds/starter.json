@@ -80,6 +80,32 @@
         "eyes": "round",
         "acc": "antenna"
       }
+    },
+    {
+      "id": "ketchup",
+      "name": "Ketchup",
+      "hue": 4,
+      "sources": [
+        "Gmail",
+        "Google Calendar",
+        "Google Drive",
+        "Slack"
+      ],
+      "cadence": "daily",
+      "tier": "default",
+      "responsibility": "Catches you up every morning. In each repo you pick, it runs /catchup: it gathers what's new from your mail, calendar, docs and Slack, saves it the way the repo expects, and asks you in plain words before anything goes into your knowledge base.",
+      "rules": [
+        "Ask before anything goes into the knowledge base",
+        "Write every question in everyday words: who, what, when"
+      ],
+      "look": {
+        "shape": "orb",
+        "eyes": "happy",
+        "acc": "beanie"
+      },
+      "job": {
+        "run": "/catchup"
+      }
     }
   ]
 }

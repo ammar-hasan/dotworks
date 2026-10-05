@@ -1,7 +1,7 @@
 import { ICON, REDUCED } from "../core/constants";
 import { $, clamp, cssKey, fmtTime, plural, reconcile, span } from "../core/helpers";
-import { NS, S, cloudOn, dueDots, pending } from "../core/state";
-import { askHtml, askSig } from "../features/asks";
+import { NS, S, awake, dueDots, pending } from "../core/state";
+import { askItems } from "../features/asks";
 import { recheckApps } from "../features/cloud";
 import { paintTell } from "../features/tell";
 import { avatarHtml, stateOf } from "../ui/characters";
@@ -11,9 +11,9 @@ import { nextEvent, renderHorizon } from "./horizon";
 /* ─── home ─── */
 export function greet() { const h = new Date().getHours(); return h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; }
 export function summaryLine() {
-  const awake = S.dots.filter(cloudOn).length, due = dueDots().length;
+  const up = S.dots.filter(awake).length, due = dueDots().length;
   let s = `${plural(S.dots.length, "atom")}`;
-  if (awake) s += ` · ${awake} awake in the cloud`;
+  if (up) s += ` · ${up} awake in the cloud`;
   s += due ? ` · ${due} ready to wake` : " · none due yet";
   const nx = nextEvent();
   if (nx) s += nx.now ? ` · you're in “${nx.ev.title}” until ${fmtTime(nx.ev.end)}` : ` · next meeting in ${span(nx.ev.start - Date.now())}`;
@@ -50,10 +50,9 @@ export function paintPeek() {
   const p = pending();
   $("#homeFoot").classList.toggle("solo", !p.length);
   if (!p.length) { box.innerHTML = ""; return; }
-  const a = p[0];
   reconcile(box, [
     { key: "peek-h", html: `<div class="peek-h" data-key="peek-h"><span class="eyebrow">Waiting on you · ${p.length}</span>${p.length > 1 ? `<button class="link" data-nav="asks">See all</button>` : ""}</div>`, sig: "h" + p.length },
-    { key: a.id, html: askHtml(a, { withDot: true }), sig: askSig(a) },
+    askItems([p[0]])[0],
   ]);
 }
 export let fieldPts = [];

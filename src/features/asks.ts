@@ -1,6 +1,7 @@
 import { appUsable, humanTool, kindOf, shortOf, toolsOf } from "../core/apps";
 import { carryOn, emailsOf } from "../ai/flow";
 import { answerText, questionOf, questionPlan } from "./questions";
+import { afterDecision, decisionsHtml, decisionsSig, groupKey, groupOf, isDecision } from "./jobs";
 import { canUndo, inverseOf, receiptHtml, receiptOf, snapshotForUndo, undoAction } from "./receipts";
 import { loadSchema, schemaOf } from "../ai/schemas";
 import { FIX, ICON, KINDS, RSVP, SRV, TZ } from "../core/constants";
@@ -84,6 +85,16 @@ export function askHtml(a, o = {}) {
     <h4>${esc(a.title)}</h4>${a.why ? `<p>${esc(a.why)}</p>` : ""}${actionPlan(a)}
     ${primary || secondary ? `<div class="row">${primary}${secondary}</div>` : ""}${err ? `<p class="err">${esc(err.msg)}</p>` : ""}</article>`;
 }
+// asks as list items: a job's decisions from one run read as one short list
+export function askItems(asks) {
+  const out = [], seen = new Set<string>();
+  for (const a of asks) {
+    if (!isDecision(a)) { out.push({ key: a.id, html: askHtml(a, { withDot: true }), sig: askSig(a) }); continue; }
+    const k = groupKey(a); if (seen.has(k)) continue; seen.add(k);
+    const grp = groupOf(a); out.push({ key: "grp:" + k, html: decisionsHtml(grp), sig: decisionsSig(grp) });
+  }
+  return out;
+}
 export function askSig(a) { const d = S.dots.find(x => x.id === a.dotId); return JSON.stringify([a, !!S.edits[a.id], !!S.armed[a.id], a.kind === "tool" ? !!schemaOf(a.payload?.server, a.payload?.tool) : 0, S.connLoaded, !!S.busy[a.id], S.errs[a.id]?.msg || "", sendOK("send"), !!NS.mcp, d?.name, hueOf(d), d && lookOf(d), Math.floor((Date.now() - (a.createdAt || 0)) / 60000)]); }
 export function paintAsks() {
   const list = $("#asksList"); if (!list) return;
@@ -97,7 +108,7 @@ export function paintAsks() {
   if ($("#asksFilter").innerHTML !== fh) $("#asksFilter").innerHTML = fh;
   const shown = p.filter(a => S.askFilter === "all" || bucketOf(a) === S.askFilter);
   if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When an atom wants to change something, or needs your say, it asks here first.") : "Sign in to see what your atoms ask you."}</p>`; if (list.innerHTML !== msg) list.innerHTML = msg; }
-  else reconcile(list, shown.map(a => ({ key: a.id, html: askHtml(a, { withDot: true }), sig: askSig(a) })));
+  else reconcile(list, askItems(shown));
   const handled = S.actions.filter(a => a.state !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)), hb = $("#handled");
   if (!handled.length) { hb.innerHTML = ""; return; }
   const wasOpen = !!hb.querySelector("details[open]");
@@ -197,6 +208,8 @@ export async function answerQuestion(id: string, choiceId: string) {
   delete S.busy[id];
   if (!ok) { renderAll(); return; }
   delete S.edits[id]; cheer(a.dotId); renderAll();
+  // a job's decision: its cloud run carries on once the whole run's decisions are answered
+  if (isDecision(a)) { afterDecision({ ...a, answer, state: "done" }); return; }
   const d = S.dots.find(x => x.id === a.dotId);
   if (d) carryOn(d, { ...a, answer, state: "done" });
 }

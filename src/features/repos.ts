@@ -4,6 +4,7 @@ import { diag } from "../core/diag";
 import { clean } from "../core/helpers";
 import { paintRepoField } from "../views/builder";
 import { paintApps } from "../views/apps";
+import { renderAll } from "../ui/shell";
 /* GitHub repos a dot works on: none, some, or all you can reach through Claude */
 export const REPO_RE = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 export function normRepos(r) {
@@ -24,4 +25,5 @@ export async function loadRepos(force?) {
   S.reposLoading = false;
   for (const m of ["new", "edit"]) paintRepoField(m);
   if (S.view === "apps") paintApps();
+  if (S.view === "dot") renderAll(); // a job-driven atom's "Add a repo" list
 }

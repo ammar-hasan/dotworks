@@ -29,3 +29,24 @@
 .rc{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font:400 11.5px/1.4 var(--f-mono);color:var(--muted)}
 .rc-t{overflow-wrap:anywhere}
 .undone{font:500 11px var(--f-mono);color:var(--warn)}
+
+/* a job's decisions: one short list per run, an answer per row */
+.ask.decide{gap:12px}
+.dec-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.dec{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.dec:first-child{border-top:0;padding-top:4px}
+.dec-src{font:500 11px/1.3 var(--f-mono);color:var(--muted)}
+.dec-t{min-width:0;display:flex;flex-direction:column;gap:3px}
+.dec-t b{font-weight:600;font-size:14.5px;line-height:1.35;overflow-wrap:anywhere}
+.dec-t small{font-size:13px;line-height:1.45;color:var(--muted)}
+.dec-btns{display:flex;gap:4px;flex-wrap:nowrap}
+.dec.done{padding:8px 0}
+.dec.done .dec-t b{font-weight:450;color:var(--ink-2)}
+.dec-said{font:500 12px var(--f-mono);color:var(--ok);white-space:nowrap}
+.dec-said.no{color:var(--faint)}
+@media (max-width:560px){
+  .dec{grid-template-columns:minmax(0,1fr);gap:6px}
+  .dec-btns{justify-content:flex-start}
+  .dec.done{grid-template-columns:minmax(0,1fr) auto}
+  .dec.done .dec-src{display:none}
+}

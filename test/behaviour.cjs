@@ -487,7 +487,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   ok(qa(d, "#activity .act-row").length === 1 && /Two things need you today/.test(text(d, "#activity")), "activity lists the check-in");
   click(w, q(d, '#dvTabs [data-tab="schedule"]')); await tick(20);
   click(w, q(d, '#cloud [data-act="cloud-open"]')); await tick(10);
-  const when = q(d, "#cl-when"); when.value = "daily"; when.dispatchEvent(new w.Event("change", { bubbles: true })); await tick(5);
+  const when = q(d, '#cloud [data-cloud="when"]'); when.value = "daily"; when.dispatchEvent(new w.Event("change", { bubbles: true })); await tick(5);
   ok(/Every day at 08:\d\d/.test(text(d, "#cloud")), "schedule preview");
   ok(!q(d, '#cloud [data-act="cloud-handoff"]') && !q(d, '#cloud [data-act="cloud-copy"]'), "no copy/paste offered up front");
   click(w, q(d, '#cloud [data-act="cloud-create"]'));
@@ -1052,6 +1052,123 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const { w, d, errors } = await load(rt, { wait: 300 });
     click(w, d.querySelector('#dotList [data-id="dot_v"]')); await tick(60);
     ok(!d.querySelector('#cmpChips [data-act="voice-toggle"]') && !d.querySelector('#msgs [data-act="speak-note"]') && d.querySelector("#micBtn")?.hidden === true, "no speech on this device: no voice controls at all");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("29. Jobs: one atom, a /catchup job per repo, decisions in plain words, filing once you've answered");
+  {
+    const rt = makeRuntime();
+    const lib = rt.db.store.get("library/starter");
+    lib.templates.push({ id: "ketchup", name: "Ketchup", responsibility: "Catches you up every morning.", rules: ["Ask first"], sources: ["Gmail", "Google Calendar"], cadence: "daily", tier: "default", hue: 4, look: { shape: "orb", eyes: "happy", acc: "beanie" }, job: { run: "/catchup" }, createdAt: 3 });
+    rt.db.store.set("library/starter", lib);
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#nav [data-nav="seeds"]')); await tick(40);
+    const card = qa(d, "#seedGrid .seedcard").find(c => /Ketchup/.test(c.textContent));
+    ok(!!card && /runs \/catchup per repo/.test(card.textContent) && /Add…/.test(card.textContent), "Ketchup on Elements: it runs /catchup in each repo you pick");
+    click(w, card.querySelector('[data-act="plant"]')); await tick(80);
+    ok(!!d.querySelector("#sh-form") && /Repos it works in · each gets its own job/.test(text(d, "#sh-repoField")) && !d.querySelector("#sh-cad") && /On each job's own schedule/.test(text(d, "#sh-form")), "Add opens it to pick repos; no wake cadence, each job has its own schedule");
+    submit(w, d.querySelector("#sh-form")); await tick(40);
+    ok(/Pick at least one repo for it to work in/.test(text(d, "#sh-err")) && !d.querySelector("#sh-save").disabled, "needs a repo first, and the button comes back");
+    for (const term of ["course", "narova"]) {
+      const sq = d.querySelector("#sh-repoq"); sq.value = term; sq.dispatchEvent(new w.Event("input", { bubbles: true })); await tick(10);
+      click(w, d.querySelector('#sh-rlist [data-act="pick-repo"]')); await tick(10);
+    }
+    submit(w, d.querySelector("#sh-form")); await tick(160);
+    const kd = dotsIn(rt).find(x => x.name === "Ketchup"), jobsIn = () => [...rt.db.store.entries()].filter(([k, v]) => v?.type === "job").map(([k, v]) => ({ id: k.split("/").pop(), ...v }));
+    const js = jobsIn().sort((a, b) => a.repo.localeCompare(b.repo));
+    ok(kd && kd.jobs?.run === "/catchup" && kd.repos?.mode === "none", "saved as an atom driven by jobs: " + JSON.stringify(kd?.jobs));
+    ok(js.length === 2 && js.every(j => j.dotId === kd.id && j.run === "/catchup" && j.cloud === null) && js.map(j => j.repo).join(",") === "ammar-hasan/narova,disrupt-gt/course-materials", "one job per repo: " + js.map(j => j.repo).join(", "));
+    ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Jobs") && !d.querySelector("#tp-schedule").hidden && d.querySelectorAll("#jobs .jobcard").length === 2, "opens on its Jobs tab: one card per job");
+    ok(/jobs course-materials \+ narova|jobs narova \+ course-materials/.test(text(d, ".dv-meta")) && /jobs not scheduled yet/.test(text(d, ".dv-meta")), "header names its jobs and says they need a schedule: " + text(d, ".dv-meta"));
+    ok(!/due/.test(text(d, "#homeActions")) && !/ready to wake/.test(text(d, "#dotList")), "never due for a wake here");
+    // schedule the course-materials job
+    const jc = js.find(j => j.repo === "disrupt-gt/course-materials"), jn = js.find(j => j.repo === "ammar-hasan/narova");
+    click(w, d.querySelector(`[data-act="cloud-open"][data-job="${jc.id}"]`)); await tick(20);
+    const sel = d.querySelector(`[data-cloud="when"][data-job="${jc.id}"]`);
+    ok(!!sel && sel.value === "daily", "a job's schedule defaults to every day");
+    sel.value = "weekdays"; sel.dispatchEvent(new w.Event("change", { bubbles: true })); await tick(10);
+    ok(/Every weekday at/.test(text(d, `#cloud-${jc.id}`)) && !/Every weekday/.test(text(d, `#cloud-${jn.id}`)), "each job has its own picker");
+    const sel2 = d.querySelector(`[data-cloud="when"][data-job="${jc.id}"]`); sel2.value = "daily"; sel2.dispatchEvent(new w.Event("change", { bubbles: true })); await tick(10);
+    click(w, d.querySelector(`[data-act="cloud-create"][data-job="${jc.id}"]`)); await tick(120);
+    const cr = rt.calls.mcp.filter(c => c.tool === "create_trigger").pop();
+    ok(cr && /^Atoms · Ketchup · course-materials · /.test(cr.input.name) && cr.input.prompt.includes(jc.id) && cr.input.prompt.includes(kd.id) && /jobId/.test(cr.input.prompt) && /\* \* \*$/.test(cr.input.cron_expression), "Schedule it creates the job's own routine: " + cr?.input.name);
+    const jc2 = rt.db.store.get(`data/users/${UID}/${jc.id}`);
+    ok(jc2.cloud?.triggerId && !rt.db.store.get(`data/users/${UID}/${kd.id}`).cloud, "linked to the job, not the atom");
+    ok(/Runs in the cloud/.test(text(d, `#cloud-${jc.id}`)) && /Not scheduled yet/.test(text(d, `#cloud-${jn.id}`)), "one job runs in the cloud, the other isn't scheduled yet");
+    // Run now runs the scheduled job in the cloud; nothing is woken here
+    const sampled = rt.calls.sample.length;
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(80);
+    ok(rt.calls.mcp.filter(c => c.tool === "fire_trigger").map(c => c.input.trigger_id).join() === jc2.cloud.triggerId && rt.calls.sample.length === sampled, "Run now fires the scheduled job, and only it; nothing wakes here");
+    // its note, and three decisions from that run
+    const now = Date.now();
+    await rt.db.api.collection(`data/users/${UID}/${kd.id}/runs`).doc("run_c1").set({ startedAt: now, finishedAt: now + 1000, status: "done", source: "cloud", jobId: jc.id, kind: "job", text: "## 3 new things came in\n- 2 meetings, 1 email\n- 3 are waiting for your say in Asks", steps: [{ label: "Read 14 emails", state: "ok" }], actionIds: ["act_d1", "act_d2", "act_d3"], thread: [] });
+    const dec = (id, title, why, source, at) => rt.db.api.collection(`data/users/${UID}`).doc(id).set({ type: "action", source: "cloud", dotId: kd.id, jobId: jc.id, runId: "run_c1", state: "pending", createdAt: now + at, kind: "question", title, why, question: { choices: [{ id: "yes", label: "Add it" }, { id: "no", label: "Skip" }], allowText: false, group: "Add these to your knowledge base?" }, about: { source }, resume: { key: id, step: "file", command: "/vkf:ingest _input/drive/x.md", file: "_input/drive/x.md" } });
+    await dec("act_d1", "Call with Sara from Acme on Tuesday", "Adds a short note about the call to your knowledge base.", "meeting", 1);
+    await dec("act_d2", "Email from Bilal about pilot pricing", "Adds the pricing points to your knowledge base.", "email", 2);
+    await dec("act_d3", "Slack thread in #product about the launch date", "Adds the launch date decision.", "chat", 3);
+    await tick(60);
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    const grp = d.querySelector("#asksList .ask.decide");
+    ok(!!grp && d.querySelectorAll("#asksList > *").length === 1 && grp.querySelectorAll(".dec").length === 3, "the run's three decisions read as one short list");
+    ok(/Add these to your knowledge base\?/.test(grp.textContent) && /course-materials/.test(grp.querySelector(".from").textContent) && /Meeting/.test(grp.textContent) && /Call with Sara from Acme on Tuesday/.test(grp.textContent) && /Adds a short note/.test(grp.textContent), "plain words: what it is, what yes does, where it came from");
+    ok(/3 asks waiting/.test(text(d, "#asksTitle")) && text(d, '#nav [data-nav="asks"] .count') === "3", "each decision counts as an ask");
+    const answer = async (id, choice) => { click(w, d.querySelector(`#asksList [data-act="answer"][data-id="${id}"][data-choice="${choice}"]`)); await tick(60); };
+    await answer("act_d1", "yes"); await answer("act_d2", "no");
+    ok(!rt.calls.mcp.some(c => c.tool === "fire_trigger" && c.input.text) && /2 of 3 answered/.test(text(d, "#asksList")) && /Added|Add it/.test(text(d, "#asksList .dec.done")), "answers show in the list; nothing runs until all are answered");
+    await answer("act_d3", "yes");
+    const fil = rt.calls.mcp.filter(c => c.tool === "fire_trigger" && c.input.text).pop();
+    ok(fil && fil.input.trigger_id === jc2.cloud.triggerId && /^Filing run/.test(fil.input.text) && fil.input.text.includes(jc.id) && fil.input.text.includes("run_c1"), "the last answer starts a filing run of that job: " + (fil?.input.text || "").slice(0, 60));
+    ok(rt.db.store.get(`data/users/${UID}/${jc.id}`).filing?.runId === "run_c1", "remembered, so another tab doesn't start it twice");
+    ok(!rt.calls.sample.some(c => Array.isArray(c.input) && /My answer to your question/.test(c.input[c.input.length - 1]?.content || "")), "no conversation here: the job carries on in the cloud");
+    ok(/carrying on with the 2 you said yes to/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "says how many it's carrying on with");
+    ok(/All clear/.test(text(d, "#asksTitle")), "the list goes once everything is answered");
+    // a run where everything was skipped starts nothing
+    await rt.db.api.collection(`data/users/${UID}`).doc("act_e1").set({ type: "action", source: "cloud", dotId: kd.id, jobId: jc.id, runId: "run_c2", state: "pending", createdAt: now + 9, kind: "question", title: "Calendar invite: Q4 offsite", why: "Adds it.", question: { choices: [{ id: "yes", label: "Add it" }, { id: "no", label: "Skip" }], allowText: false, group: "Add these?" }, about: { source: "calendar" } });
+    await tick(60);
+    const fires = rt.calls.mcp.filter(c => c.tool === "fire_trigger").length;
+    click(w, d.querySelector('#asksList [data-act="answer"][data-id="act_e1"][data-choice="no"]')); await tick(60);
+    ok(rt.calls.mcp.filter(c => c.tool === "fire_trigger").length === fires && /All skipped/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "all skipped: nothing to run");
+    // in chat: the job's note says which job, and its decisions sit under it as one list
+    click(w, d.querySelector(`#dotList [data-id="${kd.id}"]`)); await tick(40);
+    click(w, d.querySelector('#dvTabs [data-tab="chat"]')); await tick(40);
+    const note = qa(d, "#msgs .msg.dot").find(m => /3 new things came in/.test(m.textContent));
+    ok(!!note && /course-materials/.test(note.querySelector(".job-tag")?.textContent || "") && /ran in the cloud/.test(note.textContent), "its note names the job");
+    ok(d.querySelectorAll("#msgs .ask.decide").length === 1 && d.querySelectorAll("#msgs .ask.decide .dec.done").length === 3 && d.querySelectorAll('#msgs [data-act="answer"]').length === 0, "the run's decisions sit under its note, answered");
+    // a job's own instructions
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    const det = d.querySelector(`#jobs details[data-job="${jc.id}"]`); det.open = true; det.dispatchEvent(new w.Event("toggle"));
+    const ta = d.querySelector(`#jr-${jc.id}`); ta.value = "Run /catchup as operator ammar\n\nCaptures go to my Drive folder catchup/course-materials"; ta.dispatchEvent(new w.Event("input", { bubbles: true }));
+    click(w, d.querySelector(`[data-act="job-rules"][data-job="${jc.id}"]`)); await tick(60);
+    ok(JSON.stringify(rt.db.store.get(`data/users/${UID}/${jc.id}`).rules) === JSON.stringify(["Run /catchup as operator ammar", "Captures go to my Drive folder catchup/course-materials"]), "a job keeps its own instructions, one per line");
+    // add a repo, remove a job
+    click(w, d.querySelector('[data-act="job-add-open"]')); await tick(60);
+    ok(d.querySelectorAll("#jb-rlist .repo-opt").length === 1 && /factory-kb/.test(text(d, "#jb-rlist")), "Add a repo lists only repos without a job");
+    click(w, d.querySelector('#jb-rlist [data-act="job-add"]')); await tick(80);
+    ok(jobsIn().length === 3 && jobsIn().some(j => j.repo === "disrupt-corpus/factory-kb" && j.run === "/catchup"), "adding a repo adds a job that runs the same command");
+    click(w, d.querySelector(`[data-act="job-remove"][data-job="${jn.id}"]`)); await tick(20);
+    click(w, d.querySelector(`[data-act="job-remove-yes"][data-job="${jn.id}"]`)); await tick(80);
+    ok(!rt.db.store.has(`data/users/${UID}/${jn.id}`) && jobsIn().length === 2, "Remove this job removes it");
+    // deleting the atom removes its jobs and their schedules
+    S_del: {
+      click(w, d.querySelector('#dvAct summary')); click(w, d.querySelector('#dvMenu [data-act="delete-dot"]')); await tick(20);
+      ok(/its 2 jobs and their cloud schedule/.test(text(d, "#dvConfirm")), "delete says its jobs and schedules go too: " + text(d, "#dvConfirm"));
+      click(w, d.querySelector('#dvConfirm [data-act="confirm-del"]')); await tick(160);
+      ok(rt.calls.mcp.some(c => c.tool === "delete_trigger" && c.input.trigger_id === jc2.cloud.triggerId) && !rt.db.store.has(`data/users/${UID}/${kd.id}`) && jobsIn().length === 0, "atom, jobs and the job's schedule are gone");
+    }
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  {
+    // a fresh page: Add a repo waits for the repo list, then shows it by itself
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_k`, { type: "dot", name: "Ketchup", responsibility: "Catch me up.", rules: [], sources: ["Gmail"], cadence: "daily", tier: "default", hue: 4, jobs: { run: "/catchup" }, repos: { mode: "none", list: [] }, createdAt: 1 });
+    rt.db.store.set(`data/users/${UID}/job_a`, { type: "job", dotId: "dot_k", title: "course-materials", repo: "disrupt-gt/course-materials", run: "/catchup", rules: [], createdAt: 1, cloud: null });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_k"]')); await tick(30);
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(20);
+    click(w, d.querySelector('[data-act="job-add-open"]')); await tick(120);
+    ok(d.querySelectorAll("#jb-rlist .repo-opt").length === 2 && !/Loading/.test(text(d, "#jb-rlist")), "a fresh page: the repo list shows by itself once it arrives");
+    const sq = d.querySelector("#jb-repoq"); sq.focus(); sq.value = "nar"; sq.dispatchEvent(new w.Event("input", { bubbles: true })); await tick(10);
+    w.dispatchEvent(new w.Event("focus")); await tick(40);
+    ok(d.activeElement === d.querySelector("#jb-repoq") && d.querySelectorAll("#jb-rlist .repo-opt").length === 1, "typing in the search survives repaints");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");
