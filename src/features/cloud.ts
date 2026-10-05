@@ -71,12 +71,18 @@ export async function loadTriggers(refresh?) {
   S.trigLoading = false; renderAll();
 }
 
-/* the Schedule tab: an atom's own schedule, then one panel per job */
+/* the Jobs tab: an atom's own check-ins first (its main job, with its schedule), then its other jobs */
 export function paintCloud() {
   const d = curDot(); if (!d) return;
-  const box = $("#cloud"), jobs = $("#jobs");
-  // its own schedule (an atom driven by jobs has none), then its jobs
-  if (box) { const own = !jobDriven(d) || !!d.cloud; box.hidden = !own; if (own) paintCloudBox(subOf(d), box); }
+  const head = $("#mainJob"), box = $("#cloud"), jobs = $("#jobs");
+  // an atom driven by jobs has no check-ins of its own
+  const own = !jobDriven(d) || !!d.cloud;
+  if (head) {
+    const resp = clean(d.responsibility || "").replace(/\s+/g, " ").trim(), short = resp.length > 170 ? resp.slice(0, 168).replace(/\s+\S*$/, "") + "…" : resp;
+    const html = own ? `<h3>Check-ins</h3><p class="note">${resp ? `Its main job, every time it wakes: ${esc(short)}` : "Its main job, every time it wakes."}</p>` : "";
+    head.hidden = !own; if (head.innerHTML !== html) head.innerHTML = html;
+  }
+  if (box) { box.hidden = !own; if (own) paintCloudBox(subOf(d), box); }
   if (jobs) paintJobs(d, jobs);
 }
 export function paintCloudBox(s: Sub, box) {

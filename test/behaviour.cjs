@@ -502,7 +502,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   ok(rt.calls.send.length === 0, "nothing handed to a Claude chat");
   ok(/One step left: give it your Google Calendar and Gmail/.test(text(d, "#cloud")) && q(d, '#cloud a[data-act="apps-open"]')?.getAttribute("href") === "https://claude.ai/code/routines/trig_1" && q(d, '#cloud a[data-act="apps-open"]')?.target === "_blank", "tells you the apps aren't attached, with a button to Routines");
   ok(!/pause to ask/.test(text(d, "#cloud")), "no false 'runs pause to ask' warning");
-  ok(/apps not attached/.test(text(d, `#dotList [data-id="${dotId}"]`)) && /apps not attached/.test(text(d, ".dv-meta")) && /!/.test(text(d, '#dvTabs [data-tab="schedule"]')), "flagged in the sidebar, the header and the Schedule tab");
+  ok(/apps not attached/.test(text(d, `#dotList [data-id="${dotId}"]`)) && /apps not attached/.test(text(d, ".dv-meta")) && /!/.test(text(d, '#dvTabs [data-tab="schedule"]')), "flagged in the sidebar, the header and the Jobs tab");
   // the owner ticks the apps in Claude's Routines and comes back to the tab
   rt.triggers.find(x => x.id === "trig_1").mcp_connections = [{ connector_uuid: "a", name: "Google_Calendar", url: "" }, { connector_uuid: "b", name: "Gmail", url: "" }];
   w.dispatchEvent(new w.Event("focus")); await tick(60);
@@ -1080,6 +1080,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(kd && kd.jobs?.run === "/catchup" && kd.repos?.mode === "none", "saved as an atom driven by jobs: " + JSON.stringify(kd?.jobs));
     ok(js.length === 2 && js.every(j => j.dotId === kd.id && j.run === "/catchup" && j.cloud === null) && js.map(j => j.repo).join(",") === "ammar-hasan/narova,disrupt-gt/course-materials", "one job per repo: " + js.map(j => j.repo).join(", "));
     ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Jobs") && !d.querySelector("#tp-schedule").hidden && d.querySelectorAll("#jobs .jobcard").length === 2, "opens on its Jobs tab: one card per job");
+    ok(d.querySelector("#mainJob").hidden && d.querySelector("#cloud").hidden, "no check-ins of its own");
     ok(/jobs course-materials \+ narova|jobs narova \+ course-materials/.test(text(d, ".dv-meta")) && /jobs not scheduled yet/.test(text(d, ".dv-meta")), "header names its jobs and says they need a schedule: " + text(d, ".dv-meta"));
     ok(!/due/.test(text(d, "#homeActions")) && !/ready to wake/.test(text(d, "#dotList")), "never due for a wake here");
     // schedule the course-materials job
@@ -1183,7 +1184,8 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const jobsIn = () => [...rt.db.store.entries()].filter(([k, v]) => v?.type === "job").map(([k, v]) => ({ id: k.split("/").pop(), ...v }));
     click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
-    ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Schedule") && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")), "its own schedule stays on top");
+    ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Jobs") && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")), "its own schedule stays on top, on its Jobs tab");
+    ok(!d.querySelector("#mainJob").hidden && /^Check-ins/.test(text(d, "#mainJob")) && /Its main job, every time it wakes: Look at my meetings\./.test(text(d, "#mainJob")), "its own check-ins show first, as its main job");
     ok(/Give Meeting prep another job on its own schedule/.test(text(d, "#jobs")) && !!d.querySelector('#jobs [data-act="job-add-open"]'), "with Add a job underneath");
     click(w, d.querySelector('[data-act="job-add-open"]')); await tick(30);
     ok(d.querySelector('[data-act="job-kind"][data-id="task"]').getAttribute("aria-pressed") === "true" && !!d.querySelector("#jb-task"), "Add a job starts with something in plain words");

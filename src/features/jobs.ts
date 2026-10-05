@@ -80,11 +80,11 @@ export async function runJobs(d) {
   toast(n ? `${d.name} is running ${n === 1 ? jobTitle(live[0]) : plural(n, "job")} in the cloud` : "Couldn't start it. Check the Jobs tab.");
 }
 
-/* ─── the jobs part of an atom's Schedule tab ─── */
+/* ─── an atom's jobs, on its Jobs tab (its own check-ins sit above them: cloud.ts) ─── */
 export function paintJobs(d, box) {
   const jobs = jobsOf(d), driven = jobDriven(d), add = S.jobOpen["add:" + d.id];
   const head = driven ? `<div class="jobs-h"><h3>${esc(d.name)}'s jobs</h3><p class="note">Each job runs on its own schedule in the cloud. Its note lands in Chat; anything that needs your say comes to Asks first.</p></div>`
-    : jobs.length ? `<div class="jobs-h"><h3>More jobs</h3><p class="note">What ${esc(d.name)} does besides its own check-ins, each on its own schedule in the cloud.</p></div>` : "";
+    : jobs.length ? `<div class="jobs-h"><h3>More jobs</h3><p class="note">What ${esc(d.name)} does besides its check-ins, each on its own schedule in the cloud.</p></div>` : "";
   const empty = driven && !jobs.length ? `<p class="calm">No jobs yet. Add one and ${esc(d.name)} runs it on its own schedule.</p>` : "";
   const teaser = !driven && !jobs.length ? `<p class="note">Give ${esc(d.name)} another job on its own schedule: a command in one of your repos, or something in plain words.</p>` : "";
   const addBox = add ? addFormHtml(d) : jobs.length < MAX_JOBS ? `${teaser}<div class="row"><button class="btn sm" data-act="job-add-open">${ICON.plus}Add a job</button></div>` : "";

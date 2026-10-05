@@ -44,7 +44,7 @@ export function buildView() {
           </form>
         </div>
         <div class="tp scroll" id="tp-activity" role="tabpanel" aria-labelledby="tab-activity" hidden><div class="tp-in" id="activity"></div></div>
-        <div class="tp scroll" id="tp-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden><div class="tp-in"><section class="card cloud-card" id="cloud"></section><div class="jobs-box" id="jobs"></div></div></div>
+        <div class="tp scroll" id="tp-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden><div class="tp-in"><div class="jobs-h" id="mainJob" hidden></div><section class="card cloud-card" id="cloud"></section><div class="jobs-box" id="jobs"></div></div></div>
         <div class="tp scroll" id="tp-settings" role="tabpanel" aria-labelledby="tab-settings" hidden><div class="tp-in" id="settings"></div></div>
       </div>
     </section>`;

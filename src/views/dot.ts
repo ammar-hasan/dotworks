@@ -39,7 +39,7 @@ export function paintDot() {
   if (actBox.dataset.sig !== act) { actBox.innerHTML = act; actBox.dataset.sig = act; if (wasOpen) $("#dvMenu").open = true; }
   $("#dvConfirm").innerHTML = S.confirmDel ? `<span>Delete ${esc(d.name)}, its notes${jobs.length ? `, its ${plural(jobs.length, "job")}` : ""}${cloud ? ` and ${jobs.length ? "their" : "its"} cloud schedule${jobs.filter(cloudOn).length > 1 ? "s" : ""}` : ""}?</span><button class="btn danger sm" data-act="confirm-del">Delete</button><button class="btn ghost sm" data-act="cancel-del">Keep it</button>` : "";
   const asks = pending().filter(a => a.dotId === d.id).length;
-  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ["activity", "Activity", ""], ["schedule", jobbed ? "Jobs" : "Schedule", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
+  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ["activity", "Activity", ""], ["schedule", "Jobs", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
   const th = tabs.map(([k, l, extra]) => `<button role="tab" id="tab-${k}" data-tab="${k}" aria-controls="tp-${k}" aria-selected="${S.tab === k}" tabindex="${S.tab === k ? 0 : -1}">${l}${extra}</button>`).join("");
   if ($("#dvTabs").innerHTML !== th) $("#dvTabs").innerHTML = th;
   for (const k of ["chat", "activity", "schedule", "settings"]) $("#tp-" + k).hidden = S.tab !== k;
