@@ -83,6 +83,8 @@ function makeDB(opts) {
   return { store, log, setEcho: ms => { echo = ms; }, api: Object.freeze({ doc: docRef, collection: p => colRef(p) }) };
 }
 
+// the change-making tools a real Gmail connector offers (around 30), for a prompt that would overflow a tool's 1 KB
+const BIG_MAIL = ["apply_sensitive_message_label", "apply_sensitive_thread_label", "create_label", "delete_label", "forward", "label_message", "label_thread", "mark_message_spam", "mark_thread_spam", "reply", "send_message", "trash_message", "trash_thread", "unlabel_message", "unlabel_thread", "unmark_message_spam", "unmark_thread_spam", "untrash_message", "untrash_thread", "update_draft", "update_label", "update_message_labels"];
 function makeRuntime(opts = {}) {
   const calls = { sample: [], mcp: [], send: [], saves: [], composer: [], presence: [], emits: [], perms: [], uses: [] };
   const flags = {};
@@ -102,7 +104,12 @@ function makeRuntime(opts = {}) {
     if ("cache" in o && !(o.cache === true || o.cache === false || (o.cache && typeof o.cache === "object" && (o.cache.gcTime === undefined || o.cache.gcTime > 0)))) throw { code: "invalid_request", message: "bad cache" };
     if (o.modelTier && !["quick", "default", "complex"].includes(o.modelTier)) throw { code: "invalid_request", message: "bad tier" };
     if (o.signal && typeof o.signal.aborted !== "boolean") throw { code: "invalid_request", message: "signal must be an AbortSignal" };
-    for (const t of o.tools || []) { if (!/^[A-Za-z0-9_-]{1,128}$/.test(t.name) || !t.description || typeof t.execute !== "function") throw { code: "invalid_request", message: "bad tool " + t.name }; if (t.inputSchema && t.inputSchema.type !== "object") throw { code: "invalid_request", message: "schema" }; }
+    (o.tools || []).forEach((t, i) => {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(t.name) || !t.description || typeof t.execute !== "function") throw { code: "invalid_request", message: "bad tool " + t.name };
+      if (Buffer.byteLength(String(t.description)) > 1024) throw { code: "invalid_request", message: `tools[${i}] (${t.name}): description is at most 1 KB` };
+      if (t.inputSchema && t.inputSchema.type !== "object") throw { code: "invalid_request", message: "schema" };
+      if (t.inputSchema && Buffer.byteLength(JSON.stringify(t.inputSchema)) > 4096) throw { code: "invalid_request", message: `tools[${i}] (${t.name}): inputSchema is at most 4 KB` };
+    });
   };
   const checkInput = input => {
     if (typeof input === "string") { if (!input.trim()) throw { code: "invalid_request", message: "empty" }; return; }
@@ -164,10 +171,11 @@ function makeRuntime(opts = {}) {
     { id: "e2", summary: "Standup", start: { dateTime: iso(-0.5 * 3600e3) }, end: { dateTime: iso(0.25 * 3600e3) }, attendees: [{ email: "me@x.com", self: true, responseStatus: "accepted" }], htmlLink: "https://calendar.google.com/e2" },
   ];
   const mcp = {
-    async listTools() { return { servers: [...(opts.noCal ? [] : [{ server: "Google Calendar", authStatus: "connected", tools: [{ name: "list_events", annotations: { readOnlyHint: true } }, { name: "update_event" }, { name: "delete_event", annotations: { destructiveHint: true } }, ...(opts.undo ? [{ name: "get_event", annotations: { readOnlyHint: true } }, { name: "create_event" }] : [])] }]), { server: "Gmail", authStatus: "unknown", tools: [{ name: "search_threads" }, { name: "create_draft" }, ...(opts.undo ? [{ name: "delete_draft" }] : [])] }, { server: "Claude Code Remote", authStatus: "connected", tools: [{ name: "list_triggers" }] },
+    async listTools() { return { servers: [...(opts.noCal ? [] : [{ server: "Google Calendar", authStatus: "connected", tools: [{ name: "list_events", annotations: { readOnlyHint: true } }, { name: "update_event" }, { name: "delete_event", annotations: { destructiveHint: true } }, ...(opts.undo ? [{ name: "get_event", annotations: { readOnlyHint: true } }, { name: "create_event" }] : [])] }]), { server: "Gmail", authStatus: "unknown", tools: [{ name: "search_threads" }, { name: "create_draft" }, ...(opts.undo ? [{ name: "delete_draft" }] : []), ...(opts.bigMail ? BIG_MAIL.map(name => ({ name })) : [])] }, { server: "Claude Code Remote", authStatus: "connected", tools: [{ name: "list_triggers" }] },
       ...(opts.slack ? [{ server: "Slack", authStatus: "connected", tools: [{ name: "slack_search_public", annotations: { readOnlyHint: true } }, { name: "slack_send_message" }, { name: "slack_send_message_draft" }] }] : []),
       ...(opts.linear ? [{ server: "Linear", authStatus: "connected", tools: [{ name: "list_issues", annotations: { readOnlyHint: true } }, { name: "create_issue" }, { name: "delete_issue" }] }] : [])] }; },
     async describeTool(server, tool) {
+      if (opts.bigMail && server === "Gmail" && BIG_MAIL.includes(tool)) { await tick(1); return { name: tool, description: `Gmail ${tool.replace(/_/g, " ")}: changes the owner's mailbox. Use it only with ids read from Gmail first, and never for anything the owner hasn't asked to change. `.repeat(2), inputSchema: { type: "object", properties: Object.fromEntries(Array.from({ length: 30 }, (_, k) => [`field_${k}`, { type: "string", description: "A long explanation of this field that runs on and on so the schema gets big. ".repeat(3) }])), required: ["field_0"] } }; }
       const defs = {
         "Google Calendar/update_event": { description: "Updates an event on the given calendar.", inputSchema: { type: "object", properties: { eventId: { type: "string", description: "Required. Event ID." }, description: { type: "string", description: "Optional. New description." }, notificationLevel: { type: "string", enum: ["NONE", "EXTERNAL_ONLY", "ALL"] }, summary: { type: "string" } }, required: ["eventId"] } },
         "Slack/slack_send_message": { description: "Send a message to a channel.", inputSchema: { type: "object", properties: { channel_id: { type: "string" }, message: { type: "string" } }, required: ["channel_id", "message"] } },
@@ -743,7 +751,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w9, d9.querySelector('#dotList [data-id="dot_s"]')); await tick(20);
     click(w9, d9.querySelector('#dvAct [data-act="run"]')); await tick(600);
     ok((rt9.flags.slackTools || []).includes("slack_slack_search_public"), "the dot reads Slack with its own tool");
-    ok(/Slack · slack_send_message \[can't be undone\]/.test(rt9.flags.slackDesc || "") && /Google Calendar · update_event/.test(rt9.flags.slackDesc || "") && /eventId\*/.test(rt9.flags.slackDesc || ""), "propose_action lists the dot's app tools with their arguments");
+    ok(/Slack · slack_send_message \[can't be undone\]/.test(rt9.flags.lastWake || "") && /Google Calendar · update_event/.test(rt9.flags.lastWake || "") && /eventId\*/.test(rt9.flags.lastWake || "") && /Action tools you can propose/.test(rt9.flags.slackDesc || ""), "the wake lists the dot's app tools with their arguments, and propose_action points there");
     ok(!/Gmail ·/.test(rt9.flags.slackDesc || ""), "a dot can't propose tools of apps it doesn't read");
     const acts = [...rt9.db.store.entries()].filter(([k, v]) => k.startsWith(`data/users/${UID}/act_`)).map(([, v]) => v);
     const tSlack = acts.find(a => a.kind === "tool" && a.payload.tool === "slack_send_message"), tCal = acts.find(a => a.kind === "tool" && a.payload.tool === "update_event"), note = acts.find(a => a.kind === "note");
@@ -1344,6 +1352,35 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector('#mainJob [data-act="main-run"]')); await tick(600);
     ok(rt.calls.sample.some(c => typeof c.input === "string" && /waking for a check-in/.test(c.input)) && !!rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt, "the main job's Run now wakes it, here");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("33. A big app stays within Claude's limits: chat and wake work with ~30 Gmail action tools");
+  {
+    const rt = makeRuntime({ bigMail: true, perms: { "mcp:Gmail": "granted" } });
+    rt.db.store.set(`data/users/${UID}/dot_g`, { type: "dot", name: "Meet Buddy", responsibility: "Look at my meetings and email.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/dot_g/runs/run_g1`, { startedAt: Date.now() - 3600e3, finishedAt: Date.now() - 3500e3, status: "done", source: "cloud", text: "## Two meetings tomorrow", steps: [], actionIds: [], thread: [{ role: "you", text: "what are the meetings tomorrow", at: Date.now() - 60e3 }, { role: "you", text: "what are the meetings tomorrow", at: Date.now() - 30e3 }] });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_g"]')); await tick(60);
+    typeIn(w, d.querySelector("#reply"), "what are the meetings tomorrow"); submit(w, d.querySelector("#composer")); await tick(500);
+    const call = rt.calls.sample.filter(c => Array.isArray(c.input)).pop();
+    ok(call && call.o.tools.includes("propose_action") && !text(d, "#replyNote"), "a chat with ~30 Gmail action tools goes through");
+    ok(call && /Action tools you can propose with propose_action/.test(call.input[0].content) && /Gmail · send_message/.test(call.input[0].content), "the action tools are listed in its instructions, not in a tool's description");
+    const th = rt.db.store.get(`data/users/${UID}/dot_g/runs/run_g1`).thread;
+    ok(th.filter(t => t.role === "you" && t.text === "what are the meetings tomorrow").length === 1 && th[th.length - 1].role === "dot", "sending it again replaces the copies a failure left");
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(600);
+    const wake = rt.calls.sample.filter(c => typeof c.input === "string" && /waking for a check-in/.test(c.input)).pop();
+    ok(wake && /Gmail · update_draft/.test(wake.input) && rt.calls.sample.every(c => c.o?.tools === undefined || c.o.tools.length), "a wake goes through too, with the list in its prompt");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("34. A chat message that doesn't go through says why, and isn't kept");
+  {
+    const rt = makeRuntime({ sampleFail: "upstream_error" });
+    rt.db.store.set(`data/users/${UID}/dot_h`, { type: "dot", name: "Meet Buddy", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/dot_h/runs/run_h1`, { startedAt: Date.now() - 3600e3, finishedAt: Date.now() - 3500e3, status: "done", source: "cloud", text: "## Calm day", steps: [], actionIds: [], thread: [] });
+    const { w, d } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_h"]')); await tick(60);
+    typeIn(w, d.querySelector("#reply"), "anything new?"); submit(w, d.querySelector("#composer")); await tick(300);
+    ok(/That message didn't go through\. Claude didn't answer this time, a connection problem\. Try again\./.test(text(d, "#replyNote")) && d.querySelector("#reply").value === "anything new?", "it says why, and your words go back in the box");
+    ok((rt.db.store.get(`data/users/${UID}/dot_h/runs/run_h1`).thread || []).length === 0, "the unanswered message isn't kept");
   }
   console.log("20. Claude declined for this page");
   {

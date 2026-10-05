@@ -27,6 +27,23 @@ export const FIX = {
   not_granted: "it isn't allowed on this page",
   capability_disabled: "it isn't available in this view",
 };
+// why a call to Claude didn't go through, in plain words (the sample capability's error codes)
+const PAGE_BUG = "Atoms asked Claude in a way it couldn't take. That's a bug in Atoms, not you, and it's in the page's log.";
+export const SAMPLE_WHY: Record<string, string> = {
+  not_granted: "Claude isn't allowed on this page yet. Use Signals & access to turn it on.",
+  rate_limited: "Your Claude usage limit was reached. Try again later.",
+  refused: "Claude declined this one. Try rewording it.",
+  tools_unavailable: "This view can't run tools, so the atom couldn't read your apps.",
+  session_expired: "Your Claude session expired. Reload the page and sign in again.",
+  sampling_disabled: "Claude isn't available for this account here.",
+  capability_disabled: "Claude isn't available in this view.",
+  image_rejected: "That image couldn't be used. Try a JPEG or PNG.",
+  prompt_too_large: "That was too much for Claude to read at once. Wake it for a fresh note, then ask again.",
+  empty_completion: "Claude came back with nothing. Try asking another way.",
+  upstream_error: "Claude didn't answer this time, a connection problem. Try again.",
+  invalid_request: PAGE_BUG,
+  transform_error: PAGE_BUG,
+};
 export const KINDS = {
   reply: { label: "Reply", verb: "Create draft", check: "Check your Gmail drafts" },
   rsvp: { label: "RSVP", check: "Check the invite in Calendar" },

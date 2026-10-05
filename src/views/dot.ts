@@ -1,6 +1,6 @@
 import { normSources, shortOf } from "../core/apps";
 import { reposLine } from "../features/repos";
-import { ICON, TIERS } from "../core/constants";
+import { ICON, SAMPLE_WHY, TIERS } from "../core/constants";
 import { $, ago, dayLabel, esc, fmtTime, fmtWhen, handleOf, headlineOf, hueOf, md, plural, reconcile } from "../core/helpers";
 import { NS, S, awake, cloudOn, curDot, jobDriven, isNarrow, jobsOf, pending, sendOK } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
@@ -50,8 +50,8 @@ export function paintDot() {
 }
 export function threadHtml(steps) { return steps?.length ? `<ul class="thread">${steps.map(s => `<li><span class="node ${esc(s.state)}"></span><span>${esc(s.label)}</span></li>`).join("")}</ul>` : ""; }
 export function statusCopy(r) {
-  const m = { stopped: "Stopped before it finished.", truncated: "The note was cut short. Narrow the job and wake it again.", not_granted: "Claude isn't allowed on this page yet. Use Signals & access to turn it on.", rate_limited: "Your Claude usage limit was reached. Try again later.", refused: "Claude declined this one. Reword the job.", tools_unavailable: "This view can't run tools, so the atom couldn't read your sources.", session_expired: "Your Claude session expired. Sign in again.", sampling_disabled: "Claude isn't available for this account here." };
-  return m[r.errorCode] || m[r.status] || "It didn't finish. Try waking it again.";
+  const m = { stopped: "Stopped before it finished.", truncated: "The note was cut short. Narrow the job and wake it again.", refused: "Claude declined this one. Reword the job." };
+  return m[r.errorCode] || SAMPLE_WHY[r.errorCode] || m[r.status] || `It didn't finish${r.errorCode ? ` (${r.errorCode})` : ""}. Try waking it again.`;
 }
 export function noteBlock(r, d) {
   const tierNote = r.tierApplied && r.tierAsked && r.tierApplied !== r.tierAsked ? ` · ran on ${TIERS[r.tierApplied] || r.tierApplied}` : "";
