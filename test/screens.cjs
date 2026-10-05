@@ -45,6 +45,7 @@ const shots = [
   { name: "asks-decide-dark", scene: "full", ...D, scheme: "dark", steps: [nav("asks"), click('#asksFilter [data-id="question"]')] },
   { name: "m-asks-decide-dark", scene: "full", ...M, scheme: "dark", steps: [navM("asks"), click('#asksFilter [data-id="question"]')] },
   { name: "m-dot-jobs-light", scene: "full", ...M, scheme: "light", steps: [openDotM("Ketchup"), tab("schedule")] },
+  { name: "dot-checkins-off-light", scene: "full", ...D, scheme: "light", steps: [openDot("Meeting prep"), tab("schedule"), click('[data-act="checkins-off"]')] },
   { name: "dot-more-jobs-light", scene: "full", ...D, scheme: "light", steps: [openDot("Meeting prep"), tab("schedule"), async p => { await p.evaluate(() => document.querySelector("#jobs")?.scrollIntoView({ block: "start" })); await p.waitForTimeout(200); }] },
   { name: "dot-job-add-dark", scene: "full", ...D, scheme: "dark", steps: [openDot("Inbox triage"), tab("schedule"), click('[data-act="job-add-open"]'), async p => { await p.evaluate(() => document.querySelector(".job-add")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(200); }] },
   { name: "m-dot-job-add-command-light", scene: "full", ...M, scheme: "light", steps: [openDotM("Inbox triage"), tab("schedule"), click('[data-act="job-add-open"]'), click('[data-act="job-kind"][data-id="command"]'), async p => { await p.evaluate(() => document.querySelector(".job-add")?.scrollIntoView({ block: "start" })); await p.waitForTimeout(200); }] },

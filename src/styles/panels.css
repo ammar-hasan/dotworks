@@ -32,6 +32,7 @@
 .jobs-box:empty{display:none}
 .jobs-box{display:flex;flex-direction:column;gap:16px}
 .jobs-h{display:flex;flex-direction:column;gap:6px}
+.ci-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .jobs-h h3{font:700 19px/1.25 var(--f-ui);letter-spacing:-.015em}
 .jobs{display:flex;flex-direction:column;gap:18px}
 .jobcard{display:flex;flex-direction:column;gap:10px}

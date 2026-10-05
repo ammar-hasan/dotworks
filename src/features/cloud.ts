@@ -71,19 +71,24 @@ export async function loadTriggers(refresh?) {
   S.trigLoading = false; renderAll();
 }
 
-/* the Jobs tab: an atom's own check-ins first (its main job, with its schedule), then its other jobs */
+/* the Jobs tab: an atom's check-ins first (its main job, with its own schedule), then its other jobs.
+   Check-ins can be off: the atom then only does its jobs (Ketchup starts that way). */
 export function paintCloud() {
   const d = curDot(); if (!d) return;
   const head = $("#mainJob"), box = $("#cloud"), jobs = $("#jobs");
-  // an atom driven by jobs has no check-ins of its own
-  const own = !jobDriven(d) || !!d.cloud;
-  if (head) {
-    const resp = clean(d.responsibility || "").replace(/\s+/g, " ").trim(), short = resp.length > 170 ? resp.slice(0, 168).replace(/\s+\S*$/, "") + "…" : resp;
-    const html = own ? `<h3>Check-ins</h3><p class="note">${resp ? `Its main job, every time it wakes: ${esc(short)}` : "Its main job, every time it wakes."}</p>` : "";
-    head.hidden = !own; if (head.innerHTML !== html) head.innerHTML = html;
-  }
-  if (box) { box.hidden = !own; if (own) paintCloudBox(subOf(d), box); }
+  const on = !jobDriven(d) || !!d.cloud;
+  if (head) { const html = checkinsHtml(d, on); head.hidden = false; if (head.innerHTML !== html) head.innerHTML = html; }
+  if (box) { box.hidden = !on; if (on) paintCloudBox(subOf(d), box); }
   if (jobs) paintJobs(d, jobs);
+}
+function checkinsHtml(d, on: boolean) {
+  const nm = esc(d.name), busy = !!S.busy["ci:" + d.id] ? "disabled" : "";
+  if (!on) return `<h3>Check-ins</h3><p class="note">Off: ${nm} only does its jobs. <button type="button" class="link" data-act="checkins-on" ${busy}>Turn on check-ins</button></p>`;
+  const resp = clean(d.responsibility || "").replace(/\s+/g, " ").trim(), short = resp.length > 170 ? resp.slice(0, 168).replace(/\s+\S*$/, "") + "…" : resp;
+  const asking = !!S.jobOpen["ci:" + d.id];
+  return `<div class="ci-h"><h3>Check-ins</h3>${asking ? "" : `<button type="button" class="btn ghost sm" data-act="checkins-off" ${busy}>Turn off</button>`}</div>
+    <p class="note">${resp ? `Its main job, every time it wakes: ${esc(short)}` : "Its main job, every time it wakes."}</p>
+    ${asking ? `<div class="confirm" style="margin:0"><span>Turn off check-ins? ${nm} stops waking for its main job${cloudOn(d) ? ", here and in the cloud" : ""}. Its other jobs carry on.</span><button class="btn sm" data-act="checkins-off-yes">Turn off</button><button class="btn ghost sm" data-act="checkins-off-no">Keep them</button></div>` : ""}`;
 }
 export function paintCloudBox(s: Sub, box) {
   if (!box) return;
@@ -218,7 +223,7 @@ export async function cloudAct(kind, s: Sub, o: { text?: string; quiet?: boolean
   try {
     if (kind === "fire") { await NS.mcp.callTool(SRV.cloud, "fire_trigger", o.text ? { trigger_id: id, text: o.text } : { trigger_id: id }); S.cloudFiring[s.id] = Date.now(); if (!o.quiet) toast(s.j ? `${nm} is running in the cloud` : `${nm} is waking in the cloud`); }
     else if (kind === "pause" || kind === "resume") { await NS.mcp.callTool(SRV.cloud, "update_trigger", { trigger_id: id, enabled: kind === "resume" }); toast(kind === "pause" ? "Paused" : "Resumed"); }
-    else if (kind === "sleep") { try { await NS.mcp.callTool(SRV.cloud, "delete_trigger", { trigger_id: id }); } catch (e) { if (e?.code !== "tool_error") throw e; } await saveRec(s, { cloud: null, cloudPending: null }); toast(s.j ? `${nm} has no schedule now` : `${nm} will only wake here now`); }
+    else if (kind === "sleep") { try { await NS.mcp.callTool(SRV.cloud, "delete_trigger", { trigger_id: id }); } catch (e) { if (e?.code !== "tool_error") throw e; } await saveRec(s, { cloud: null, cloudPending: null }); if (!o.quiet) toast(s.j ? `${nm} has no schedule now` : `${nm} will only wake here now`); }
   } catch (e) {
     ok = false; diag("cloud." + kind, e);
     S.errs[ek] = FIX[e?.code] ? `Scheduled tasks — ${FIX[e.code]}.` : e?.code === "tool_error" ? (clean(e.message).slice(0, 200) || "That didn't go through.") : "Couldn't confirm that went through. The schedule shown is the current state.";

@@ -1,7 +1,7 @@
 import { ICON } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clean, cssKey, esc, hueOf, newId, plural, toast, upsertLocal } from "../core/helpers";
-import { NS, S, cloudOn, curDot, jobDriven, jobsOf, userDoc } from "../core/state";
+import { NS, S, cloudOn, curDot, jobDriven, jobsOf, upsertDocLocal, userDoc } from "../core/state";
 import { avatarHtml } from "../ui/characters";
 import { openDot } from "../ui/nav";
 import { renderAll } from "../ui/shell";
@@ -71,6 +71,20 @@ export async function saveJob(j, o: { task?: string; rules: string }) {
   catch (e) { diag("db.job.save", e); toast(`Couldn't save (${e?.code || "error"}).`); renderAll(); return false; }
 }
 
+/* An atom's check-ins (its main job) on or off. Off stops its own schedule first; its jobs carry on either way.
+   Stored as `jobs`: an object while check-ins are off (keeping the command a template gave it), null while on. */
+export async function setCheckins(d, on: boolean) {
+  const k = "ci:" + d.id; if (S.busy[k]) return;
+  S.busy[k] = true; renderAll();
+  try {
+    if (!on && (cloudOn(d) || d.cloudPending) && !(await cloudAct("sleep", subOf(d), { quiet: true })) && cloudOn(S.dots.find(x => x.id === d.id))) { toast(`Couldn't stop ${d.name}'s schedule, so its check-ins stay on. Try again.`); return; }
+    const fields = { jobs: on ? null : { run: d.jobs?.run || null }, cloudPending: null };
+    await userDoc(d.id).update(fields); upsertDocLocal(d.id, fields);
+    toast(on ? `Check-ins on. ${d.name} wakes for its main job again.` : `Check-ins off. ${d.name} only does its jobs now.`);
+  } catch (e) { diag("db.checkins", e); toast(`Couldn't change it (${e?.code || "error"}).`); }
+  finally { delete S.busy[k]; renderAll(); }
+}
+
 /* Run now on an atom driven by jobs: run each scheduled job now, in the cloud (a page can't run a repo's command) */
 export async function runJobs(d) {
   const jobs = jobsOf(d), live = jobs.filter(cloudOn);
@@ -90,7 +104,7 @@ export function paintJobs(d, box) {
   const addBox = add ? addFormHtml(d) : jobs.length < MAX_JOBS ? `${teaser}<div class="row"><button class="btn sm" data-act="job-add-open">${ICON.plus}Add a job</button></div>` : "";
   const html = head + `<div class="jobs">${jobs.map(j => jobCardHtml(d, j)).join("")}</div>${empty}${addBox}`;
   // repaint only when something structural changes, never because of what's being typed
-  const f = S.jobDraft[d.id], opens = Object.entries(S.jobOpen).filter(([k]) => !k.startsWith("q:"));
+  const f = S.jobDraft[d.id], opens = Object.entries(S.jobOpen).filter(([k]) => !k.startsWith("q:") && !k.startsWith("ci:"));
   const sig = JSON.stringify([d.name, d.jobs, jobs.map(j => [j.id, j.title, j.repo, j.run, j.task, j.rules, cloudOn(j)]), opens, add ? [f?.kind, f?.repo] : 0, !!S.repos, S.reposErr, S.errs["jobadd:" + d.id] || ""]);
   if (box.dataset.sig !== sig) { box.innerHTML = html; box.dataset.sig = sig; }
   for (const j of jobs) paintCloudBox(subOf(d, j), $(`#cloud-${cssKey(j.id)}`));
@@ -114,7 +128,7 @@ function jobCardHtml(d, j) {
 
 /* ─── Add a job ─── */
 export function jobDraft(d) {
-  if (!S.jobDraft[d.id]) S.jobDraft[d.id] = jobDriven(d) ? { kind: "command", run: d.jobs.run, repo: null, task: "", title: "", q: "" } : { kind: "task", run: "", repo: null, task: "", title: "", q: "" };
+  if (!S.jobDraft[d.id]) S.jobDraft[d.id] = jobDriven(d) && d.jobs.run ? { kind: "command", run: d.jobs.run, repo: null, task: "", title: "", q: "" } : { kind: "task", run: "", repo: null, task: "", title: "", q: "" };
   return S.jobDraft[d.id];
 }
 function addFormHtml(d) {

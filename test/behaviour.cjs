@@ -1080,7 +1080,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(kd && kd.jobs?.run === "/catchup" && kd.repos?.mode === "none", "saved as an atom driven by jobs: " + JSON.stringify(kd?.jobs));
     ok(js.length === 2 && js.every(j => j.dotId === kd.id && j.run === "/catchup" && j.cloud === null) && js.map(j => j.repo).join(",") === "ammar-hasan/narova,disrupt-gt/course-materials", "one job per repo: " + js.map(j => j.repo).join(", "));
     ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Jobs") && !d.querySelector("#tp-schedule").hidden && d.querySelectorAll("#jobs .jobcard").length === 2, "opens on its Jobs tab: one card per job");
-    ok(d.querySelector("#mainJob").hidden && d.querySelector("#cloud").hidden, "no check-ins of its own");
+    ok(/Off: Ketchup only does its jobs/.test(text(d, "#mainJob")) && !!d.querySelector('#mainJob [data-act="checkins-on"]') && d.querySelector("#cloud").hidden, "its check-ins are off, and it says so");
     ok(/jobs course-materials \+ narova|jobs narova \+ course-materials/.test(text(d, ".dv-meta")) && /jobs not scheduled yet/.test(text(d, ".dv-meta")), "header names its jobs and says they need a schedule: " + text(d, ".dv-meta"));
     ok(!/due/.test(text(d, "#homeActions")) && !/ready to wake/.test(text(d, "#dotList")), "never due for a wake here");
     // schedule the course-materials job
@@ -1260,6 +1260,34 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     await tick(80);
     click(w, d.querySelector('#nav [data-nav="home"]')); await tick(60);
     ok(/Latest: Wednesday is your lightest day/.test(d.querySelector('#field .orb-btn[data-id="dot_m"]')?.title || "") && rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt === own, "a job's note shows as the atom's latest on Home; its own check-ins keep their time");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("31. Check-ins on and off: an atom can do only its jobs");
+  {
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/job_w`, { type: "job", dotId: "dot_m", title: "Week plan", task: "Every Monday, plan my week.", repo: null, run: null, rules: [], createdAt: 2, cloud: null });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    // give its check-ins a schedule in the cloud first
+    click(w, d.querySelector('#cloud [data-act="cloud-open"]')); await tick(20);
+    click(w, d.querySelector('#cloud [data-act="cloud-create"]')); await tick(150);
+    const own = rt.db.store.get(`data/users/${UID}/dot_m`).cloud;
+    ok(!!own?.triggerId && /^Check-ins/.test(text(d, "#mainJob")) && !!d.querySelector('#mainJob [data-act="checkins-off"]'), "check-ins come first, and can be turned off");
+    click(w, d.querySelector('[data-act="checkins-off"]')); await tick(20);
+    ok(/Turn off check-ins\? Meeting prep stops waking for its main job, here and in the cloud\. Its other jobs carry on\./.test(text(d, "#mainJob")), "it asks first, and says what happens");
+    click(w, d.querySelector('[data-act="checkins-off-no"]')); await tick(20);
+    ok(!rt.db.store.get(`data/users/${UID}/dot_m`).jobs && !!d.querySelector('[data-act="checkins-off"]') && !rt.calls.mcp.some(c => c.tool === "delete_trigger"), "Keep them changes nothing");
+    click(w, d.querySelector('[data-act="checkins-off"]')); await tick(20);
+    click(w, d.querySelector('[data-act="checkins-off-yes"]')); await tick(200);
+    const m = rt.db.store.get(`data/users/${UID}/dot_m`);
+    ok(m.jobs && typeof m.jobs === "object" && !m.cloud && rt.calls.mcp.some(c => c.tool === "delete_trigger" && c.input.trigger_id === own.triggerId), "off: its own schedule stops");
+    ok(/Off: Meeting prep only does its jobs/.test(text(d, "#mainJob")) && d.querySelector("#cloud").hidden && /Meeting prep's jobs/.test(text(d, "#jobs")) && /Week plan/.test(text(d, "#jobs .jobcard")), "the tab says so, and its jobs stay");
+    ok(/Run now/.test(text(d, '#dvAct [data-act="run"]')) && !/wake it|ready to wake/.test(text(d, '#dotList [data-id="dot_m"]')) && /Check-ins off\. Meeting prep only does its jobs now\./.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "no Wake, nothing due, and it says what changed");
+    // and back on
+    click(w, d.querySelector('[data-act="checkins-on"]')); await tick(120);
+    ok(rt.db.store.get(`data/users/${UID}/dot_m`).jobs === null && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")) && /Wake/.test(text(d, '#dvAct [data-act="run"]')) && !!d.querySelector('[data-act="checkins-off"]'), "on again: its check-ins are back, ready to schedule");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");

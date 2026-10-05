@@ -1,13 +1,13 @@
-ATOMS — CLOUD WAKE RUNBOOK (v8)
+ATOMS — CLOUD WAKE RUNBOOK (v9)
 
 You are waking one "atom" for its owner while they are away. An atom is a small assistant with a standing responsibility; in the data it is stored as a "dot" (its id, the dotId, starts with "dot_"). The instruction that sent you here names the artifact URL and the dotId. If it also names a jobId, you are running one of the atom's jobs: do steps 1 and 2, then follow "JOBS" at the end.
 
 1. Tools. Load ArtifactData with ToolSearch ("select:ArtifactData").
 
 2. Read the atom. ArtifactData get with url = the artifact, collection "data/users/me", doc_id = dotId. Keep the returned version.
-   If the document does not exist, STOP here and write nothing: the owner deleted the atom. If you are not running a job and its "cloud" field is missing or null, STOP too: the owner let it sleep. (A job has its own "cloud" field; J1 checks it.)
+   If the document does not exist, STOP here and write nothing: the owner deleted the atom. If you are not running a job, and its "cloud" field is missing or null or its check-ins are off (see "jobs" below), STOP too: the owner let it sleep. (A job has its own "cloud" field; J1 checks it.)
    Use these fields: name, responsibility, rules (list), sources, repos, vips (person ids, optional), cloud.tz, jobs. Ignore notesAssetId; files are only read on the page.
-   jobs, when present, means the atom is driven by its jobs only: it has no check-ins of its own.
+   Its check-ins are off when "jobs" is an object (not missing, not null): the atom then only does its jobs.
    repos is {"mode": "none" | "some" | "all", "list": ["owner/repo", ...]}; a missing repos field means none.
    sources are the owner's app names exactly as Claude shows them, for example "Google Calendar", "Gmail" or "Slack". Older atoms say "calendar" (Google Calendar) and "gmail" (Gmail).
    Also read ArtifactData get collection "data/users/me", doc_id "apps_prefs": any app named in its "off" list is turned off for Atoms; don't use it.
@@ -103,7 +103,7 @@ J6. The note. ArtifactData set with collection "data/users/me/<dotId>/runs", doc
    - what was added or changed, by name (a follow-up run says what it added);
    - what failed and what to do about it. A source that couldn't be read is "couldn't read Slack", never "0".
    steps: one per meaningful step, for example "Read 14 emails" or "Saved 6 new things to your Drive folder".
-   After the note, ArtifactData update the job (if_version from J1; if the version changed, get it again and retry once) with {"seen":<its seen list plus the resume keys you asked about this run, newest 300>,"lastRunAt":<when you began, epoch ms>,"lastStatus":<status>,"filing":null}. Then, only if the atom has a "jobs" field, the first part of step 8 (the atom's lastRunAt and lastStatus). Then step 9.
+   After the note, ArtifactData update the job (if_version from J1; if the version changed, get it again and retry once) with {"seen":<its seen list plus the resume keys you asked about this run, newest 300>,"lastRunAt":<when you began, epoch ms>,"lastStatus":<status>,"filing":null}. Then, only if the atom's check-ins are off (step 2), the first part of step 8 (the atom's lastRunAt and lastStatus). Then step 9.
 
 PLAIN-WORDS JOBS
 
@@ -118,6 +118,6 @@ P2. Do steps 3 to 7 for the job's task, with these changes:
 
 P3. Update the job: ArtifactData update collection "data/users/me", doc_id = jobId, if_version = the version from J1 (if the version changed, get it again and retry once), with {"lastRunAt":<when you began, epoch ms>,"lastStatus":<status>,"filing":null}.
    For each answered question you acted on, ArtifactData update it with {"continuedAt":<now, epoch ms>} and its version as if_version, so it isn't acted on twice.
-   Then, only if the atom has a "jobs" field, the first part of step 8 (the atom's lastRunAt and lastStatus). Then step 9.
+   Then, only if the atom's check-ins are off (step 2), the first part of step 8 (the atom's lastRunAt and lastStatus). Then step 9.
 
 Never, in a job: message anyone (no email, no Slack messages or DMs, no comments); change anything in the owner's apps yourself, except the files a command job's command saves in the owner's own Drive folders (everything else waits for the owner's approval as an ask); create, change or delete scheduled tasks; push with --force or --no-verify; touch any repo other than a command job's own; change the job or the atom beyond J3, J6, P3 and step 8.

@@ -75,7 +75,7 @@ export function repoListHtml(f, mode) {
 export function repoFieldHtml(f, mode) {
   const p = prefixOf(mode), m = f.repoMode || "none", list = f.repoList || [];
   // an atom driven by jobs: the repos it works in are its jobs
-  if (f.jobbed) return `<span class="eyebrow">Repos</span><p class="note">Each of its jobs works in one repo. <button type="button" class="link" data-act="tab" data-id="schedule">See its jobs</button></p>`;
+  if (f.jobbed) return `<span class="eyebrow">Repos</span><p class="note">Its check-ins are off. Each command job works in its own repo. <button type="button" class="link" data-act="tab" data-id="schedule">See its jobs</button></p>`;
   if (f.job) {
     if (!S.repos && !S.reposLoading && !S.reposErr) setTimeout(() => loadRepos(), 0);
     return `<span class="eyebrow">Repos it works in · each gets its own job</span><div class="people">${list.map(x => `<span class="person repo-chip"><span>${esc(x)}</span><button type="button" data-act="unpick-repo" data-id="${esc(x)}" data-mode="${mode}" aria-label="Remove ${esc(x)}">×</button></span>`).join("")}</div>
