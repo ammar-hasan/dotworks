@@ -55,7 +55,7 @@ export function builderHtml(f, mode) {
     <div class="b-look" id="${p}-look">${lookBlock(f, p)}</div>
     <div class="two"><div class="field-i"><label class="eyebrow" for="${p}-name">Name</label><input type="text" id="${p}-name" data-f="name" maxlength="40" value="${esc(f.name)}" placeholder="Meeting prep"></div>
       <div class="field-i"><span class="eyebrow">Handle</span><div class="note mono" id="${p}-handle" style="padding:11px 0">${esc(handleOf(f))}</div></div></div>
-    <div class="field-i"><label class="eyebrow" for="${p}-resp">Its one job</label><textarea class="job" id="${p}-resp" data-f="responsibility" maxlength="900" placeholder="What should it keep an eye on, and what's worth telling you about?">${esc(f.responsibility)}</textarea></div>
+    <div class="field-i"><label class="eyebrow" for="${p}-resp">Its main job${f.jobbed ? " · off" : ""}</label><textarea class="job" id="${p}-resp" data-f="responsibility" maxlength="900" placeholder="What should it keep an eye on, and what's worth telling you about?">${esc(f.responsibility)}</textarea></div>
     <div class="field-i"><label class="eyebrow" for="${p}-rules">House rules · one per line</label><textarea id="${p}-rules" data-f="rulesText" maxlength="900" style="min-height:64px" placeholder="Never propose more than 3 actions">${esc(f.rulesText || "")}</textarea></div>
     <div class="field-i"><span class="eyebrow">It may read</span><div class="checks" id="${p}-srcs">${[...new Set([...appsAvail(), ...normSources(f.sources)])].map(n => `<label title="${esc(appInfo(n).does)}"><input type="checkbox" data-f="src" data-src="${esc(n)}" value="${esc(n)}" ${normSources(f.sources).includes(n) ? "checked" : ""}>${esc(shortOf(n))}${S.appsOff.has(n) ? " (off)" : S.connLoaded && NS.mcp && !S.conn[n] ? " (not connected)" : ""}</label>`).join("") || '<span class="fine">No apps are on. Turn some on in Apps.</span>'}</div></div>
     <div class="field-i" id="${p}-repoField">${repoFieldHtml(f, mode)}</div>
@@ -75,7 +75,7 @@ export function repoListHtml(f, mode) {
 export function repoFieldHtml(f, mode) {
   const p = prefixOf(mode), m = f.repoMode || "none", list = f.repoList || [];
   // an atom driven by jobs: the repos it works in are its jobs
-  if (f.jobbed) return `<span class="eyebrow">Repos</span><p class="note">Its check-ins are off. Each command job works in its own repo. <button type="button" class="link" data-act="tab" data-id="schedule">See its jobs</button></p>`;
+  if (f.jobbed) return `<span class="eyebrow">Repos</span><p class="note">Its main job is off. Each command job works in its own repo. <button type="button" class="link" data-act="tab" data-id="schedule">See its jobs</button></p>`;
   if (f.job) {
     if (!S.repos && !S.reposLoading && !S.reposErr) setTimeout(() => loadRepos(), 0);
     return `<span class="eyebrow">Repos it works in · each gets its own job</span><div class="people">${list.map(x => `<span class="person repo-chip"><span>${esc(x)}</span><button type="button" data-act="unpick-repo" data-id="${esc(x)}" data-mode="${mode}" aria-label="Remove ${esc(x)}">×</button></span>`).join("")}</div>

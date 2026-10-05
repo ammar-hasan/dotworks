@@ -71,24 +71,32 @@ export async function loadTriggers(refresh?) {
   S.trigLoading = false; renderAll();
 }
 
-/* the Jobs tab: an atom's check-ins first (its main job, with its own schedule), then its other jobs.
-   Check-ins can be off: the atom then only does its jobs (Ketchup starts that way). */
+/* the Jobs tab: the atom's main job first (what it does whenever it wakes: when you tap Wake, or on its own schedule),
+   laid out like its other jobs below it. The main job can be off: the atom then only does its other jobs (Ketchup
+   starts that way). Internally the main job is still the atom's "check-ins" (setCheckins). */
 export function paintCloud() {
   const d = curDot(); if (!d) return;
-  const head = $("#mainJob"), box = $("#cloud"), jobs = $("#jobs");
+  const head = $("#mainJob"), box = $("#cloud"), more = $("#mainMore"), jobs = $("#jobs");
   const on = !jobDriven(d) || !!d.cloud;
-  if (head) { const html = checkinsHtml(d, on); head.hidden = false; if (head.innerHTML !== html) head.innerHTML = html; }
+  const paint = (el, html) => { if (el && el.dataset.sig !== html) { el.innerHTML = html; el.dataset.sig = html; } };
+  paint(head, mainJobHtml(d, on));
   if (box) { box.hidden = !on; if (on) paintCloudBox(subOf(d), box); }
+  if (more) { more.hidden = !on; paint(more, on ? mainMoreHtml(d) : ""); }
   if (jobs) paintJobs(d, jobs);
 }
-function checkinsHtml(d, on: boolean) {
-  const nm = esc(d.name), busy = !!S.busy["ci:" + d.id] ? "disabled" : "";
-  if (!on) return `<h3>Check-ins</h3><p class="note">Off: ${nm} only does its jobs. <button type="button" class="link" data-act="checkins-on" ${busy}>Turn on check-ins</button></p>`;
+function mainJobHtml(d, on: boolean) {
+  const busy = S.busy["ci:" + d.id] ? "disabled" : "";
+  if (!on) return `<div class="job-h"><b>Main job</b></div><p class="job-task">Off: ${esc(d.name)} only does the jobs below. <button type="button" class="link" data-act="checkins-on" ${busy}>Turn it on</button></p>`;
   const resp = clean(d.responsibility || "").replace(/\s+/g, " ").trim(), short = resp.length > 170 ? resp.slice(0, 168).replace(/\s+\S*$/, "") + "…" : resp;
-  const asking = !!S.jobOpen["ci:" + d.id];
-  return `<div class="ci-h"><h3>Check-ins</h3>${asking ? "" : `<button type="button" class="btn ghost sm" data-act="checkins-off" ${busy}>Turn off</button>`}</div>
-    <p class="note">${resp ? `Its main job, every time it wakes: ${esc(short)}` : "Its main job, every time it wakes."}</p>
-    ${asking ? `<div class="confirm" style="margin:0"><span>Turn off check-ins? ${nm} stops waking for its main job${cloudOn(d) ? ", here and in the cloud" : ""}. Its other jobs carry on.</span><button class="btn sm" data-act="checkins-off-yes">Turn off</button><button class="btn ghost sm" data-act="checkins-off-no">Keep them</button></div>` : ""}`;
+  return `<div class="job-h"><b>Main job</b></div><p class="job-task">Whenever it wakes${resp ? `: ${esc(short)}` : "."}</p>`;
+}
+function mainMoreHtml(d) {
+  const nm = esc(d.name), asking = !!S.jobOpen["ci:" + d.id], open = asking || !!S.jobOpen["main:" + d.id], busy = S.busy["ci:" + d.id] ? "disabled" : "";
+  return `<details class="job-more" data-job="main:${esc(d.id)}" ${open ? "open" : ""}><summary>Change this job</summary>
+      <p class="note">You set what it does in Settings, under “Its main job”. <button type="button" class="link" data-act="tab" data-id="settings">Open Settings</button></p>
+      <div class="row"><span class="grow"></span><button class="btn ghost sm danger" data-act="checkins-off" ${busy}>Turn off its main job…</button></div>
+      ${asking ? `<div class="confirm" style="margin:0"><span>Turn off ${nm}'s main job? It stops waking for it${cloudOn(d) ? ", here and in the cloud" : ""}. Its other jobs carry on.</span><button class="btn sm" data-act="checkins-off-yes" ${busy}>Turn off</button><button class="btn ghost sm" data-act="checkins-off-no">Keep it</button></div>` : ""}
+    </details>`;
 }
 export function paintCloudBox(s: Sub, box) {
   if (!box) return;

@@ -1080,7 +1080,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(kd && kd.jobs?.run === "/catchup" && kd.repos?.mode === "none", "saved as an atom driven by jobs: " + JSON.stringify(kd?.jobs));
     ok(js.length === 2 && js.every(j => j.dotId === kd.id && j.run === "/catchup" && j.cloud === null) && js.map(j => j.repo).join(",") === "ammar-hasan/narova,disrupt-gt/course-materials", "one job per repo: " + js.map(j => j.repo).join(", "));
     ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Jobs") && !d.querySelector("#tp-schedule").hidden && d.querySelectorAll("#jobs .jobcard").length === 2, "opens on its Jobs tab: one card per job");
-    ok(/Off: Ketchup only does its jobs/.test(text(d, "#mainJob")) && !!d.querySelector('#mainJob [data-act="checkins-on"]') && d.querySelector("#cloud").hidden, "its check-ins are off, and it says so");
+    ok(/^Main job/.test(text(d, "#mainJob")) && /Off: Ketchup only does the jobs below/.test(text(d, "#mainJob")) && !!d.querySelector('#mainJob [data-act="checkins-on"]') && d.querySelector("#cloud").hidden && d.querySelector("#mainMore").hidden, "its main job is off, and the first card says so");
     ok(/jobs course-materials \+ narova|jobs narova \+ course-materials/.test(text(d, ".dv-meta")) && /jobs not scheduled yet/.test(text(d, ".dv-meta")), "header names its jobs and says they need a schedule: " + text(d, ".dv-meta"));
     ok(!/due/.test(text(d, "#homeActions")) && !/ready to wake/.test(text(d, "#dotList")), "never due for a wake here");
     // schedule the course-materials job
@@ -1176,7 +1176,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(d.activeElement === d.querySelector("#jb-repoq") && d.querySelectorAll("#jb-rlist .repo-opt").length === 1, "typing in the search survives repaints");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
-  console.log("30. Jobs on any atom: its own check-ins stay, plus jobs in plain words or any command");
+  console.log("30. Jobs on any atom: its main job stays, plus jobs in plain words or any command");
   {
     const rt = makeRuntime();
     rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
@@ -1185,7 +1185,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
     ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Jobs") && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")), "its own schedule stays on top, on its Jobs tab");
-    ok(!d.querySelector("#mainJob").hidden && /^Check-ins/.test(text(d, "#mainJob")) && /Its main job, every time it wakes: Look at my meetings\./.test(text(d, "#mainJob")), "its own check-ins show first, as its main job");
+    ok(/^Main job/.test(text(d, "#mainJob")) && /Whenever it wakes: Look at my meetings\./.test(text(d, "#mainJob")) && /Change this job/.test(text(d, "#mainMore")), "its main job is the first card, laid out like a job");
     ok(/Give Meeting prep another job on its own schedule/.test(text(d, "#jobs")) && !!d.querySelector('#jobs [data-act="job-add-open"]'), "with Add a job underneath");
     click(w, d.querySelector('[data-act="job-add-open"]')); await tick(30);
     ok(d.querySelector('[data-act="job-kind"][data-id="task"]').getAttribute("aria-pressed") === "true" && !!d.querySelector("#jb-task"), "Add a job starts with something in plain words");
@@ -1196,7 +1196,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector('[data-act="job-add-save"]')); await tick(80);
     const wk = jobsIn()[0];
     ok(jobsIn().length === 1 && wk.dotId === "dot_m" && wk.title === "Week plan" && /overloaded/.test(wk.task) && !wk.repo && !wk.run, "a plain-words job: " + JSON.stringify({ title: wk?.title, task: wk?.task?.slice(0, 30) }));
-    ok(/More jobs/.test(text(d, "#jobs")) && /Week plan/.test(text(d, "#jobs .jobcard")) && /tell me which days are overloaded/.test(text(d, "#jobs .job-task")) && /\+ 1 job/.test(text(d, ".dv-meta")), "it shows under More jobs, and the header counts it");
+    ok(/Week plan/.test(text(d, "#jobs .jobcard")) && /tell me which days are overloaded/.test(text(d, "#jobs .job-task")) && /\+ 1 job/.test(text(d, ".dv-meta")), "it shows below the main job, and the header counts it");
     ok(!rt.db.store.get(`data/users/${UID}/dot_m`).jobs, "the atom keeps its own check-ins (not job-driven)");
     // its own schedule
     click(w, d.querySelector(`[data-act="cloud-open"][data-job="${wk.id}"]`)); await tick(20);
@@ -1227,7 +1227,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // in chat, it knows about its jobs
     typeIn(w, d.querySelector("#reply"), "What do you do on Mondays?"); submit(w, d.querySelector("#composer")); await tick(500);
     const chatCall = rt.calls.sample.filter(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === "What do you do on Mondays?").pop();
-    ok(chatCall && /Besides your own check-ins, you have jobs that run in the cloud/.test(chatCall.input[0].content) && /Week plan: Every Monday, look at my week/.test(chatCall.input[0].content) && /\/vkf:freshness in course-materials \(no schedule yet\)/.test(chatCall.input[0].content), "in chat it knows its jobs");
+    ok(chatCall && /Besides your main job, you have jobs that run in the cloud/.test(chatCall.input[0].content) && /Week plan: Every Monday, look at my week/.test(chatCall.input[0].content) && /\/vkf:freshness in course-materials \(no schedule yet\)/.test(chatCall.input[0].content), "in chat it knows its jobs");
     // a question from the plain-words job: an ordinary card, and the job carries on with the answer in the cloud
     await rt.db.api.collection(`data/users/${UID}`).doc("act_wq").set({ type: "action", source: "cloud", dotId: "dot_m", jobId: wk.id, runId: "run_w1", state: "pending", createdAt: Date.now(), kind: "question", title: "Which day should I keep free next week?", why: "Three days are over six hours of meetings.", question: { choices: [{ id: "c1", label: "Tuesday" }, { id: "c2", label: "Wednesday" }, { id: "c3", label: "Thursday" }], allowText: true } });
     await tick(60);
@@ -1262,7 +1262,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(/Latest: Wednesday is your lightest day/.test(d.querySelector('#field .orb-btn[data-id="dot_m"]')?.title || "") && rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt === own, "a job's note shows as the atom's latest on Home; its own check-ins keep their time");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
-  console.log("31. Check-ins on and off: an atom can do only its jobs");
+  console.log("31. The main job on and off: an atom can do only its other jobs");
   {
     const rt = makeRuntime();
     rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
@@ -1270,24 +1270,28 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const { w, d, errors } = await load(rt, { wait: 300 });
     click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
-    // give its check-ins a schedule in the cloud first
+    // give the main job a schedule in the cloud first
     click(w, d.querySelector('#cloud [data-act="cloud-open"]')); await tick(20);
     click(w, d.querySelector('#cloud [data-act="cloud-create"]')); await tick(150);
     const own = rt.db.store.get(`data/users/${UID}/dot_m`).cloud;
-    ok(!!own?.triggerId && /^Check-ins/.test(text(d, "#mainJob")) && !!d.querySelector('#mainJob [data-act="checkins-off"]'), "check-ins come first, and can be turned off");
+    const more = d.querySelector('#mainMore details'); more.open = true; more.dispatchEvent(new w.Event("toggle")); await tick(10);
+    ok(!!own?.triggerId && /^Main job/.test(text(d, "#mainJob")) && !!d.querySelector('#mainMore [data-act="checkins-off"]') && !!d.querySelector('#mainMore [data-act="tab"][data-id="settings"]'), "its main job can be turned off, and changed in Settings");
     click(w, d.querySelector('[data-act="checkins-off"]')); await tick(20);
-    ok(/Turn off check-ins\? Meeting prep stops waking for its main job, here and in the cloud\. Its other jobs carry on\./.test(text(d, "#mainJob")), "it asks first, and says what happens");
+    ok(/Turn off Meeting prep's main job\? It stops waking for it, here and in the cloud\. Its other jobs carry on\./.test(text(d, "#mainMore")), "it asks first, and says what happens");
     click(w, d.querySelector('[data-act="checkins-off-no"]')); await tick(20);
-    ok(!rt.db.store.get(`data/users/${UID}/dot_m`).jobs && !!d.querySelector('[data-act="checkins-off"]') && !rt.calls.mcp.some(c => c.tool === "delete_trigger"), "Keep them changes nothing");
+    ok(!rt.db.store.get(`data/users/${UID}/dot_m`).jobs && !d.querySelector('[data-act="checkins-off-yes"]') && !rt.calls.mcp.some(c => c.tool === "delete_trigger"), "Keep it changes nothing");
     click(w, d.querySelector('[data-act="checkins-off"]')); await tick(20);
     click(w, d.querySelector('[data-act="checkins-off-yes"]')); await tick(200);
     const m = rt.db.store.get(`data/users/${UID}/dot_m`);
     ok(m.jobs && typeof m.jobs === "object" && !m.cloud && rt.calls.mcp.some(c => c.tool === "delete_trigger" && c.input.trigger_id === own.triggerId), "off: its own schedule stops");
-    ok(/Off: Meeting prep only does its jobs/.test(text(d, "#mainJob")) && d.querySelector("#cloud").hidden && /Meeting prep's jobs/.test(text(d, "#jobs")) && /Week plan/.test(text(d, "#jobs .jobcard")), "the tab says so, and its jobs stay");
-    ok(/Run now/.test(text(d, '#dvAct [data-act="run"]')) && !/wake it|ready to wake/.test(text(d, '#dotList [data-id="dot_m"]')) && /Check-ins off\. Meeting prep only does its jobs now\./.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "no Wake, nothing due, and it says what changed");
+    ok(/Off: Meeting prep only does the jobs below/.test(text(d, "#mainJob")) && d.querySelector("#cloud").hidden && d.querySelector("#mainMore").hidden && /Week plan/.test(text(d, "#jobs .jobcard")), "the first card says so, and its other jobs stay");
+    ok(/Run now/.test(text(d, '#dvAct [data-act="run"]')) && !/wake it|ready to wake/.test(text(d, '#dotList [data-id="dot_m"]')) && /Main job off\. Meeting prep only does its other jobs now\./.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "no Wake, nothing due, and it says what changed");
     // and back on
     click(w, d.querySelector('[data-act="checkins-on"]')); await tick(120);
-    ok(rt.db.store.get(`data/users/${UID}/dot_m`).jobs === null && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")) && /Wake/.test(text(d, '#dvAct [data-act="run"]')) && !!d.querySelector('[data-act="checkins-off"]'), "on again: its check-ins are back, ready to schedule");
+    ok(rt.db.store.get(`data/users/${UID}/dot_m`).jobs === null && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")) && /Wake/.test(text(d, '#dvAct [data-act="run"]')) && !!d.querySelector('#mainMore [data-act="checkins-off"]'), "on again: its main job is back, ready to schedule");
+    // Settings calls it its main job
+    click(w, d.querySelector('#dvTabs [data-tab="settings"]')); await tick(30);
+    ok(/Its main job/i.test(text(d, "#settings")), "Settings calls it its main job");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");

@@ -21,13 +21,13 @@ export function paintDot() {
   $("#dvName").textContent = d.name;
   const srcs = normSources(d.sources).map(shortOf).join(" + ") || "nothing yet";
   const rl = jobbed ? (jobs.length > 2 ? `${jobTitle(jobs[0])} +${jobs.length - 1}` : jobs.map(jobTitle).join(" + ")) : reposLine(d);
-  // an atom with jobs besides its own check-ins says how many
+  // an atom with jobs besides its main job says how many
   const more = !jobbed && jobs.length ? `<span class="rd">+ ${plural(jobs.length, "job")}</span>` : "";
   const meta = `<span class="hd">${esc(handleOf(d))}</span><span class="${cl}">${esc(st)}</span><span class="rd">reads ${esc(srcs)}</span>${rl ? `<span class="rd">${jobbed ? "jobs" : "repos"} ${esc(rl)}</span>` : ""}${more}`;
   if ($("#dvMeta").innerHTML !== meta) $("#dvMeta").innerHTML = meta;
   // an atom driven by jobs runs them in the cloud; the others wake here with Claude
   const canRun = jobbed ? !!NS.mcp : !!NS.sample && !S.running && (S.perms as any).sample !== "denied";
-  const runTitle = jobbed ? "Run its jobs now, in the cloud (W)" : NS.sample ? "Wake it for a check-in (W)" : "Waking needs Claude in this view";
+  const runTitle = jobbed ? "Run its jobs now, in the cloud (W)" : NS.sample ? "Wake it now for its main job (W)" : "Waking needs Claude in this view";
   const act = `${live ? `<button class="btn" data-act="stop" aria-label="Stop">${ICON.stop}<span class="lbl">Stop</span></button>` : `<button class="btn pri" data-act="run" aria-label="${jobbed ? "Run now" : "Wake"}" ${canRun ? "" : "disabled"} title="${runTitle}">${ICON.bolt}<span class="lbl">${jobbed ? "Run now" : "Wake"}</span></button>`}
     <details class="menu" id="dvMenu"><summary class="icon-btn" aria-label="More">${ICON.more}</summary><div class="menu-list">
       ${NS.db && S.canShare !== false ? `<button data-act="share">Share as an element</button>` : ""}
@@ -74,8 +74,8 @@ export function paintChat() {
   if (!S.runsLoaded) blocks.push({ key: "loading", html: `<div data-key="loading" class="col"><div class="skel" style="width:40%"></div><div class="skel" style="height:90px"></div></div>`, sig: "l" });
   const runs = S.runs.slice().reverse(), myActs = S.actions.filter(a => a.dotId === d.id);
   if (S.runsLoaded && !runs.length && !S.running) {
-    const how = jobDriven(d) ? `My jobs are on the Jobs tab: give each a schedule and I'll run ${esc(d.jobs?.run || "them")} there in the cloud. Anything that needs your say comes to Asks first.` : "Wake me for a check-in, or just ask me something.";
-    blocks.push({ key: "intro", sig: "i" + d.name + d.responsibility + hueOf(d) + JSON.stringify(lookOf(d)) + how, html: `<div class="msg dot" data-key="intro"><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${esc(handleOf(d))}</div><div class="intro-card">Hi, I'm ${esc(d.name)}. My job: ${esc(d.responsibility)} <br><br>${how}</div></div></div>` });
+    const how = jobDriven(d) ? `My jobs are on the Jobs tab: give each a schedule and I'll run ${esc(d.jobs?.run || "them")} there in the cloud. Anything that needs your say comes to Asks first.` : "Tap Wake and I'll do it now, or just ask me something.";
+    blocks.push({ key: "intro", sig: "i" + d.name + d.responsibility + hueOf(d) + JSON.stringify(lookOf(d)) + how, html: `<div class="msg dot" data-key="intro"><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${esc(handleOf(d))}</div><div class="intro-card">Hi, I'm ${esc(d.name)}. ${jobDriven(d) ? "What I do" : "My main job"}: ${esc(d.responsibility)} <br><br>${how}</div></div></div>` });
   }
   let lastDay = "";
   const shown = new Set<string>();
@@ -162,7 +162,7 @@ export function paintComposer() {
 export function paintActivity() {
   const box = $("#activity"), d = curDot(); if (!box || !d) return;
   if (!S.runsLoaded) { box.innerHTML = '<div class="skel" style="height:60px"></div>'; return; }
-  if (!S.runs.length) { box.innerHTML = `<p class="calm">Nothing yet. Every check-in ${esc(d.name)} does — here or in the cloud — shows up here with what it looked at.</p>`; return; }
+  if (!S.runs.length) { box.innerHTML = `<p class="calm">Nothing yet. Every time ${esc(d.name)} wakes, here or in the cloud, it shows up here with what it looked at.</p>`; return; }
   const open = new Set([...box.querySelectorAll("details.act-row[open]")].map(x => x.dataset.id));
   box.innerHTML = S.runs.map(r => {
     const asks = S.actions.filter(a => a.runId === r.id).length, replies = (r.thread || []).filter(t => t.role !== "dot").length;
