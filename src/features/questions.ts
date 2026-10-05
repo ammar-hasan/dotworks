@@ -52,6 +52,7 @@ export function answerText(a, choiceId): string {
 }
 
 // answers a dot hasn't acted on yet, newest first: they go into its next wake
+// (a job's questions belong to that job: it acts on them in the cloud)
 export const openAnswers = d => S.actions
-  .filter(a => a.dotId === d.id && a.kind === "question" && a.state === "done" && a.answer?.text && !a.continuedAt)
+  .filter(a => a.dotId === d.id && !a.jobId && a.kind === "question" && a.state === "done" && a.answer?.text && !a.continuedAt)
   .sort((x, y) => (y.answer.at || 0) - (x.answer.at || 0)).slice(0, 5);

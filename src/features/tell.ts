@@ -2,7 +2,8 @@ import { normSources, shortOf } from "../core/apps";
 import { ICON } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, autosize, clean, esc, toast } from "../core/helpers";
-import { NS, S } from "../core/state";
+import { NS, S, jobsOf, lastAt } from "../core/state";
+import { jobLine } from "./jobs";
 import { normRepos } from "./repos";
 import { sendReply } from "../ai/flow";
 import { avatarHtml } from "../ui/characters";
@@ -16,13 +17,13 @@ import { openNew, renderSheet, draftWithClaude } from "../views/builder";
 const STOP = new Set("about after again also because been before could does doing done from have just like make more need only other over should some than that their them then there these they this those very want what when where which while will with would your yours please thanks today tomorrow".split(" "));
 const words = (t: string) => [...new Set(clean(t).toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g) || [])].filter(w => !STOP.has(w));
 function score(d, ws: string[]) {
-  const hay = words([d.name, d.responsibility, ...(d.rules || []), ...normSources(d.sources).map(shortOf), ...normRepos(d.repos).list].join(" "));
+  const hay = words([d.name, d.responsibility, ...(d.rules || []), ...normSources(d.sources).map(shortOf), ...normRepos(d.repos).list, ...jobsOf(d).map(jobLine)].join(" "));
   return ws.reduce((n, w) => n + (hay.some(h => h === w || (w.length > 4 && (h.startsWith(w.slice(0, 5)) || w.startsWith(h.slice(0, 5))))) ? 1 : 0), 0);
 }
 // best first, by how many of your words a dot's job shares; recent activity breaks ties
 export function rankDots(text: string) {
   const ws = words(text);
-  return S.dots.map(d => ({ d, n: score(d, ws) })).sort((a, b) => b.n - a.n || (b.d.lastRunAt || 0) - (a.d.lastRunAt || 0));
+  return S.dots.map(d => ({ d, n: score(d, ws) })).sort((a, b) => b.n - a.n || (lastAt(b.d) || 0) - (lastAt(a.d) || 0));
 }
 // without Claude: only a clear winner counts as sure
 function guess(text: string) {
@@ -31,7 +32,7 @@ function guess(text: string) {
 }
 
 function routePrompt(text: string) {
-  const list = S.dots.map(d => `- ${d.id}: "${clean(d.name)}". Job: ${clean(d.responsibility).replace(/\s+/g, " ").slice(0, 260)} Reads: ${normSources(d.sources).map(shortOf).join(", ") || "nothing"}.${normRepos(d.repos).mode !== "none" ? " Watches GitHub repos." : ""}`).join("\n");
+  const list = S.dots.map(d => `- ${d.id}: "${clean(d.name)}". Job: ${clean(d.responsibility).replace(/\s+/g, " ").slice(0, 260)} Reads: ${normSources(d.sources).map(shortOf).join(", ") || "nothing"}.${normRepos(d.repos).mode !== "none" ? " Watches GitHub repos." : ""}${jobsOf(d).length ? " Also: " + jobsOf(d).slice(0, 4).map(jobLine).join("; ") + "." : ""}`).join("\n");
   return `The owner of a set of personal assistant "atoms" typed a message for them. Each atom has one job. Pick the atom whose job this message belongs to.\nThe message:\n"""${text.slice(0, 1200)}"""\nTheir atoms:\n${list}\nReply with only one JSON object: {"atom": "<the id of the best atom, or none if no atom's job covers this>", "sure": true or false}`;
 }
 

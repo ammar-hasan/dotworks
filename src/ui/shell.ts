@@ -1,7 +1,7 @@
 import { CADENCE, ICON, VERSION } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, esc, fmtWhen, hueOf, plural, reconcile, span } from "../core/helpers";
-import { NS, S, cloudOn, curDot, hasJobs, isDue, jobsOf, pending } from "../core/state";
+import { NS, S, cloudOn, curDot, jobDriven, isDue, jobsOf, pending } from "../core/state";
 import { cloudFiringFor, missingApps } from "../features/cloud";
 import { renderAcct } from "./account";
 import { avatarHtml, stateOf } from "./characters";
@@ -47,9 +47,9 @@ export function paintBanner() {
 }
 export function dotStatus(d) {
   if (S.running?.dotId === d.id) return [S.running.text ? "writing you a note…" : "awake now", "live"];
-  if (cloudFiringFor(d)) return [hasJobs(d) ? "running in the cloud" : "waking in the cloud", "cl"];
+  if (cloudFiringFor(d)) return [jobDriven(d) ? "running in the cloud" : "waking in the cloud", "cl"];
   const asks = pending().filter(a => a.dotId === d.id).length;
-  if (hasJobs(d)) return jobsStatus(d, asks);
+  if (jobDriven(d)) return jobsStatus(d, asks);
   if (cloudOn(d)) { const t = S.triggers?.get(d.cloud.triggerId); if (t && !t.enabled) return ["paused in the cloud", ""];
     if (t && missingApps(d, t).length) return ["cloud · apps not attached", "warn"]; return [t?.next ? "cloud · " + fmtWhen(Date.parse(t.next)).replace(/^today /, "") : "awake in the cloud", "cl"]; }
   if (asks) return [plural(asks, "ask") + " for you", ""];

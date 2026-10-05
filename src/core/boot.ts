@@ -5,7 +5,7 @@ import { diag } from "./diag";
 import { clean, clone, fmtDay, headlineOf, hueOf, tierOf } from "./helpers";
 import { restoreHot } from "./hot";
 import { setPresence, startRoom } from "./room";
-import { NS, S, cloudOn, connPerm, runsCol, userDoc } from "./state";
+import { NS, S, cloudOn, connPerm, lastAt, runsCol, userDoc } from "./state";
 import { loadTriggers, paintCloud } from "../features/cloud";
 import { jobSpecOf } from "../features/jobs";
 import { renderAcct } from "../ui/account";
@@ -104,7 +104,7 @@ export function subscribe() {
   }, e => { diag("db.dots", e); S.dotsLoaded = true; renderAll(); });
   col.where("type", "==", "job").onSnapshot(snap => {
     S.jobs = snap.docs.map(x => ({ id: x.id, ...clone(x.data()) })).filter(j => typeof j.dotId === "string");
-    S.jobsLoaded = true; renderAll();
+    S.jobsLoaded = true; loadLatest(); renderAll();
     if (S.jobs.some(j => cloudOn(j) || j.cloudPending) && connPerm(SRV.cloud) === "granted" && !S.triggers) loadTriggers();
   }, e => { diag("db.jobs", e); S.jobsLoaded = true; renderAll(); });
   col.where("type", "==", "action").onSnapshot(snap => {
@@ -121,10 +121,12 @@ export function sanitizeSeed(t) {
 }
 export async function loadLatest() {
   if (!NS.db || !S.uid) return;
-  const todo = S.dots.filter(d => d.lastRunAt && S.latest[d.id]?.at !== d.lastRunAt);
+  // an atom's latest note, read again whenever it or one of its jobs has run since
+  const todo = S.dots.filter(d => lastAt(d) && S.latest[d.id]?.at !== lastAt(d));
   for (const d of todo) {
-    try { const snap = await runsCol(d.id).orderBy("startedAt", "desc").limit(1).get(); const r = snap.docs[0]?.data(); S.latest[d.id] = r ? { at: d.lastRunAt, headline: headlineOf(r.text), day: fmtDay(r.startedAt) } : { at: d.lastRunAt }; }
-    catch (e) { S.latest[d.id] = { at: d.lastRunAt }; diag("db.latest", e); }
+    const at = lastAt(d); S.latest[d.id] = { ...S.latest[d.id], at };
+    try { const snap = await runsCol(d.id).orderBy("startedAt", "desc").limit(1).get(); const r = snap.docs[0]?.data(); S.latest[d.id] = r ? { at, headline: headlineOf(r.text), day: fmtDay(r.startedAt) } : { at }; }
+    catch (e) { S.latest[d.id] = { at }; diag("db.latest", e); }
   }
   if (todo.length) { renderAll(); maybeDigest(); }
 }

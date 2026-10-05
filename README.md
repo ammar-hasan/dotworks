@@ -24,7 +24,7 @@ To pick up new code or an app you've just connected, say **"update Atoms"** in t
           │  dots, asks, notes  ──────▶  store (db, private per person)
           │  reads + approved asks ───▶  your connectors (MCP)
           │  thinking  ───────────────▶  Claude (sample)
-          │  "Keep it awake"  ────────▶  one routine per dot (Claude Code Remote)
+          │  "Keep it awake"  ────────▶  one routine per dot, and per job (Claude Code Remote)
           ▼
  routine fires ─▶ cloud session ─▶ reads meta/runbook ─▶ reads the dot's apps & repos
                                   └▶ writes a note + asks back into the store
@@ -36,7 +36,7 @@ To pick up new code or an app you've just connected, say **"update Atoms"** in t
 - **Asks** are tool calls in waiting: the card is built from the tool's own schema, you can edit every argument, and only *Approve* runs it. Afterwards a receipt says what changed, with an Undo where there's an exact way back.
 - **Questions**: when the right move depends on something only you know, an atom asks with a few answers to tap, and carries on as soon as you answer.
 - **One box on Home**: type what you want and it goes to the atom whose job fits, or offers to make one.
-- **Jobs**: an atom can run a command from your repos, like `/catchup`, as jobs: one per repo, each on its own schedule in the cloud. Whenever the command needs your say, it leaves plain-words questions in Asks ("Call with Sara on Tuesday · Add it / Skip"), and once you've answered a run's questions it carries on with what you said yes to. **Ketchup** on Elements is a ready-made one.
+- **Jobs**: any atom can have more jobs, each on its own schedule in the cloud, from its Schedule tab (*Add a job*). A job is either something in plain words ("every Monday, tell me which days are overloaded"), done with the atom's own apps, or a command from one of your repos, like `/catchup` in `course-materials`, run under that repo's rules. The atom's own check-ins stay its main job. Whatever a job needs your say on comes to Asks; yes-or-no ones show as one short list per run ("Call with Sara on Tuesday · Add it / Skip"). Once you've answered a run's questions, the job carries on in a short follow-up run. **Ketchup** on Elements is an atom made only of jobs: `/catchup`, one per repo.
 - **Voice**: turn on voice on an atom's page and it reads its replies aloud in its own voice (your device's built-in voices; pick one in its settings). Any note has *Read aloud*. You talk back with your keyboard's mic, and in voice mode your message goes when you pause. Where the page may use the microphone, a mic button gives you a hands-free back and forth.
 
 ### Platform limits worth knowing

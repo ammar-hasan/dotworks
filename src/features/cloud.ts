@@ -2,7 +2,7 @@ import { normSources } from "../core/apps";
 import { FIX, SRV, TZ } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clamp, clean, cssKey, esc, fmtWhen, hueOf, pad, toast, upsertLocal } from "../core/helpers";
-import { NS, S, artifactUrl, cloudOn, connPerm, curDot, hasJobs, jobsOf, userDoc } from "../core/state";
+import { NS, S, artifactUrl, cloudOn, connPerm, curDot, jobDriven, jobsOf, userDoc } from "../core/state";
 import { renderAll } from "../ui/shell";
 import { jobTitle, paintJobs } from "./jobs";
 
@@ -30,7 +30,7 @@ export function firingFor(s: Sub) {
 export const cloudFiringFor = d => firingFor(subOf(d)) || jobsOf(d).some(j => firingFor(subOf(d, j)));
 export function cloudPlan(s: Sub) {
   const dr = S.cloudDraft[s.id] || {}, d = s.d, j = s.j;
-  const def = j ? "daily" : d.cadence === "weekly" ? "weekly" : d.cadence === "hourly" ? "every3" : "weekdays";
+  const def = j ? (j.run ? "daily" : "weekdays") : d.cadence === "weekly" ? "weekly" : d.cadence === "hourly" ? "every3" : "weekdays";
   const when = ["weekdays", "daily", "weekly", "every3"].includes(dr.when) ? dr.when : def;
   const hour = clamp(Number(dr.hour ?? 9) || 9, 5, 22), push = dr.push !== false;
   const taskName = j ? `Atoms · ${d.name} · ${jobTitle(j)} · ${j.id.slice(-4)}` : `Atoms · ${d.name} · ${d.id.slice(-4)}`;
@@ -71,17 +71,13 @@ export async function loadTriggers(refresh?) {
   S.trigLoading = false; renderAll();
 }
 
-/* the Schedule tab: an atom's own schedule, or, for an atom driven by jobs, one panel per job */
+/* the Schedule tab: an atom's own schedule, then one panel per job */
 export function paintCloud() {
   const d = curDot(); if (!d) return;
   const box = $("#cloud"), jobs = $("#jobs");
-  if (hasJobs(d)) {
-    if (box) { box.hidden = !d.cloud; if (d.cloud) paintCloudBox(subOf(d), box); }
-    if (jobs) paintJobs(d, jobs);
-    return;
-  }
-  if (jobs && jobs.innerHTML) jobs.innerHTML = "";
-  if (box) { box.hidden = false; paintCloudBox(subOf(d), box); }
+  // its own schedule (an atom driven by jobs has none), then its jobs
+  if (box) { const own = !jobDriven(d) || !!d.cloud; box.hidden = !own; if (own) paintCloudBox(subOf(d), box); }
+  if (jobs) paintJobs(d, jobs);
 }
 export function paintCloudBox(s: Sub, box) {
   if (!box) return;

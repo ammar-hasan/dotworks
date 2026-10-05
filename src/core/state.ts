@@ -4,7 +4,7 @@ import { CADENCE } from "./constants";
 // One mutable object for the whole app; views read it and repaint. Fields not listed here are added at runtime.
 const init = {
   booted: false, uid: null, me: null, isOwner: false, canShare: null,
-  dots: [], dotsLoaded: false, actions: [], seeds: [], seedsLoaded: false, adopts: {}, myAdopts: [], jobs: [] as any[], jobsLoaded: false, jobOpen: {} as Record<string, any>,
+  dots: [], dotsLoaded: false, actions: [], seeds: [], seedsLoaded: false, adopts: {}, myAdopts: [], jobs: [] as any[], jobsLoaded: false, jobOpen: {} as Record<string, any>, jobDraft: {} as Record<string, any>,
   runs: [], runsLoaded: false, latest: {}, pruned: new Set(),
   unsubRuns: null, settingsKey: "", appUrl: "", appUrlLoaded: false,
   repos: null, reposAt: 0, reposLoading: false, reposErr: null, reposOpen: false,
@@ -32,11 +32,14 @@ export const curDot = () => (S.view === "dot" ? S.dots.find(d => d.id === S.sele
 export const isNarrow = () => { try { return !!window.matchMedia && matchMedia("(max-width: 760px)").matches; } catch { return false; } };
 export const pending = () => S.actions.filter(a => a.state === "pending");
 export const cloudOn = d => !!d?.cloud?.triggerId;
-/* jobs (features/jobs.ts): an atom marked with `jobs` is driven by them, each on its own schedule in the cloud */
-export const hasJobs = d => !!d?.jobs;
+/* jobs (features/jobs.ts): any atom can have jobs, each on its own schedule in the cloud. An atom marked with
+   `jobs` ({run}) is driven by them only: it has no schedule of its own (Ketchup). */
+export const jobDriven = d => !!d?.jobs;
 export const jobsOf = d => S.jobs.filter(j => j.dotId === d?.id).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 export const awake = d => cloudOn(d) || jobsOf(d).some(cloudOn);
-export const isDue = d => !cloudOn(d) && !hasJobs(d) && (!d.lastRunAt || Date.now() - d.lastRunAt > (CADENCE[d.cadence] || CADENCE.daily));
+// when the atom or one of its jobs last ran (a job's run leaves the atom's own lastRunAt, and so its check-ins, alone)
+export const lastAt = d => Math.max(d?.lastRunAt || 0, ...jobsOf(d).map(j => j.lastRunAt || 0)) || null;
+export const isDue = d => !cloudOn(d) && !jobDriven(d) && (!d.lastRunAt || Date.now() - d.lastRunAt > (CADENCE[d.cadence] || CADENCE.daily));
 export const dueDots = () => S.dots.filter(isDue);
 // a change to an atom or job document, shown at once (the store's echo follows)
 export function upsertDocLocal(id: string, fields: Record<string, any>) { for (const arr of [S.dots, S.jobs]) { const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = { ...arr[i], ...fields }; } }

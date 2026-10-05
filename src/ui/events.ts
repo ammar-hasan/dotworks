@@ -6,12 +6,12 @@ import { KINDS, SRV, VERSION } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, autosize, clean, cssKey, fitBytes, fmtTime, fmtWhen, handleOf, slug, toast } from "../core/helpers";
 import { refreshCanSend } from "../core/room";
-import { NS, S, curDot, hasJobs, upsertDocLocal, userDoc } from "../core/state";
+import { NS, S, curDot, jobDriven, upsertDocLocal, userDoc } from "../core/state";
 import { answerQuestion, execute, setActionState, undoAction } from "../features/asks";
 import { deliver, newDotFrom, paintTell, tellDots } from "../features/tell";
 import { cancelAutoSend, dictationPaused, listen, setVoiceMode, speak, stopListening, stopSpeaking } from "../features/voice";
 import { cloudAct, cloudCreate, cloudFind, cloudPlan, loadTriggers, paintCloud, subOf } from "../features/cloud";
-import { addJobs, curJob, jobRepoList, removeJob, runJobs, saveJobRules } from "../features/jobs";
+import { curJob, jobDraft, jobRepoList, removeJob, runJobs, saveJob, saveNewJob } from "../features/jobs";
 import { deleteDot } from "../features/delete";
 import { allow, closeAcct, renderAcct } from "./account";
 import { lookOf } from "./characters";
@@ -56,7 +56,7 @@ document.addEventListener("click", ev => {
     case "repos-toggle": S.reposOpen = !S.reposOpen; if (S.reposOpen) loadRepos(); paintApps(); break;
     case "pick-person": { const mode = b.dataset.mode, f = draftOf(mode); if (f) { f.vips = [...new Set([...(f.vips || []), id])].slice(0, 5); const p = prefixOf(mode); $(`#${p}-people`).value = ""; $(`#${p}-plist`).hidden = true; paintPeoplePicker(mode); $(`#${p}-people`).focus(); } break; }
     case "unpick-person": { const mode = b.dataset.mode, f = draftOf(mode); if (f) { f.vips = (f.vips || []).filter(x => x !== id); paintPeoplePicker(mode); } break; }
-    case "run": if (d) { if (hasJobs(d)) runJobs(d); else runDot(d.id); } break;
+    case "run": if (d) { if (jobDriven(d)) runJobs(d); else runDot(d.id); } break;
     case "stop": S.running?.ctl.abort(); break;
     case "run-due": runDue(); break;
     case "suggest": sendReply(id); break;
@@ -133,10 +133,13 @@ document.addEventListener("click", ev => {
     case "cloud-sleep": { const s = sub(); if (s) cloudAct("sleep", s); break; }
     case "cloud-create": { const s = sub(); if (s) cloudCreate(s); break; }
     // jobs
-    case "job-add-open": if (d) { S.jobOpen["add:" + d.id] = true; paintCloud(); setTimeout(() => $("#jb-repoq")?.focus(), 0); } break;
-    case "job-add-close": if (d) { delete S.jobOpen["add:" + d.id]; delete S.jobOpen["q:" + d.id]; paintCloud(); } break;
-    case "job-add": if (d && hasJobs(d) && REPO_RE.test(id || "")) addJobs(d, [id], d.jobs.run).then(made => { if (made.length) toast(`Added ${id.split("/").pop()}. Give it a schedule below.`); renderAll(); }, e => { diag("db.job.add", e); toast(`Couldn't add it (${e?.code || "error"}).`); }); break;
-    case "job-rules": if (job) saveJobRules(job, (($(`#jr-${cssKey(job.id)}`) as any)?.value) ?? "").then(() => { delete S.edits["job:" + job.id]; }); break;
+    case "job-add-open": if (d) { S.jobOpen["add:" + d.id] = true; const f = jobDraft(d); paintCloud(); setTimeout(() => $(f.kind === "task" ? "#jb-task" : f.repo ? "#jb-run" : "#jb-repoq")?.focus(), 0); } break;
+    case "job-add-close": if (d) { delete S.jobOpen["add:" + d.id]; delete S.jobDraft[d.id]; delete S.errs["jobadd:" + d.id]; paintCloud(); } break;
+    case "job-kind": if (d && (id === "task" || id === "command")) { jobDraft(d).kind = id; delete S.errs["jobadd:" + d.id]; paintCloud(); setTimeout(() => $(id === "task" ? "#jb-task" : "#jb-repoq")?.focus(), 0); } break;
+    case "job-pick-repo": if (d && REPO_RE.test(id || "")) { const f = jobDraft(d); f.repo = id; f.q = ""; paintCloud(); setTimeout(() => $("#jb-run")?.focus(), 0); } break;
+    case "job-unpick-repo": if (d) { jobDraft(d).repo = null; paintCloud(); setTimeout(() => $("#jb-repoq")?.focus(), 0); } break;
+    case "job-add-save": if (d) saveNewJob(d); break;
+    case "job-save": if (job) { const k = cssKey(job.id), task = ($(`#jt-${k}`) as any)?.value, rules = ($(`#jr-${k}`) as any)?.value ?? ""; saveJob(job, { task, rules }).then(ok => { if (ok) { delete S.edits["job:" + job.id]; delete S.edits["jobtask:" + job.id]; } }); } break;
     case "job-remove": if (job) { S.jobOpen["rm:" + job.id] = true; S.jobOpen[job.id] = true; paintCloud(); } break;
     case "job-remove-no": if (job) { delete S.jobOpen["rm:" + job.id]; paintCloud(); } break;
     case "job-remove-yes": if (job) { delete S.jobOpen["rm:" + job.id]; removeJob(job); } break;
@@ -161,8 +164,10 @@ document.addEventListener("input", ev => {
   if ((t as any).dataset?.edit && S.edits[(t as any).dataset.id]) S.edits[(t as any).dataset.id][(t as any).dataset.edit] = (t as any).type === "checkbox" ? (t as any).checked : (t as any).value;
   if ((t as any).dataset?.people) searchPeople((t as any).dataset.people, (t as any).value);
   if ((t as any).dataset?.repoq) { const mode = (t as any).dataset.repoq, f = draftOf(mode); if (f) { f.repoQ = (t as any).value; const l = $(`#${prefixOf(mode)}-rlist`); if (l) l.innerHTML = repoListHtml(f, mode); } }
-  if ((t as any).dataset?.jobq) { const d = curDot(); if (d) { S.jobOpen["q:" + d.id] = (t as any).value; const l = $("#jb-rlist"); if (l) l.innerHTML = jobRepoList(d); } }
+  if ((t as any).dataset?.jobq) { const d = curDot(); if (d) { jobDraft(d).q = (t as any).value; const l = $("#jb-rlist"); if (l) l.innerHTML = jobRepoList(d); } }
+  if ((t as any).dataset?.jobf) { const d = curDot(), k = (t as any).dataset.jobf; if (d && ["run", "task", "title"].includes(k)) { jobDraft(d)[k] = (t as any).value; if (k === "run") { const l = $("#jb-rlist"); if (l) l.innerHTML = jobRepoList(d); } } }
   if ((t as any).dataset?.jobrules) S.edits["job:" + (t as any).dataset.jobrules] = (t as any).value;
+  if ((t as any).dataset?.jobtask) S.edits["jobtask:" + (t as any).dataset.jobtask] = (t as any).value;
   if ((t as any).id === "reply") { autosize(t); dictationPaused(() => { S.handsFree = false; sendReply(); }); }
 });
 document.addEventListener("change", ev => {
@@ -201,7 +206,7 @@ document.addEventListener("keydown", ev => {
   }
   if (typing || ev.metaKey || ev.ctrlKey || ev.altKey || S.sheet) return;
   if (ev.key === "n" || ev.key === "N") { if (S.uid) { ev.preventDefault(); openNew(null); } }
-  else if ((ev.key === "w" || ev.key === "W") && S.view === "dot") { ev.preventDefault(); const d = curDot(); if (d && hasJobs(d)) runJobs(d); else runDot(S.selected); }
+  else if ((ev.key === "w" || ev.key === "W") && S.view === "dot") { ev.preventDefault(); const d = curDot(); if (d && jobDriven(d)) runJobs(d); else runDot(S.selected); }
   else if (ev.key === "]") { if (S.dots.length) { ev.preventDefault(); cycle(1); } }
   else if (ev.key === "[") { if (S.dots.length) { ev.preventDefault(); cycle(-1); } }
   else if (ev.key === "/" && S.view === "dot") { ev.preventDefault(); if (S.tab !== "chat") { S.tab = "chat"; renderAll(); } $("#reply")?.focus(); }

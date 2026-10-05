@@ -5,7 +5,7 @@ import { refreshAssets } from "../core/boot";
 import { ACCS, CADENCE, EYES, ICON, SHAPES, TEXT_TYPES, TIERS } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clean, esc, handleOf, hueOf, newId, tierOf, toast, upsertLocal } from "../core/helpers";
-import { NS, S, hasJobs, userDoc } from "../core/state";
+import { NS, S, jobDriven, userDoc } from "../core/state";
 import { addJobs } from "../features/jobs";
 import { closeAcct } from "../ui/account";
 import { avatarHtml, lookOf } from "../ui/characters";
@@ -15,7 +15,7 @@ import { canSpeak, voices } from "../features/voice";
 import { cantSave, recordAdopt, rememberNew } from "./seeds";
 
 /* ─── builder: make / change a dot ─── */
-export function draftFromDot(d) { return { id: d.id, jobbed: hasJobs(d), voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
+export function draftFromDot(d) { return { id: d.id, jobbed: jobDriven(d), voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
 export function blankDraft() { const hue = Math.floor(Math.random() * 360); return { pid: newId("dot_"), voiceName: "", name: "", responsibility: "", rulesText: "", sources: ["Google Calendar", "Gmail"].filter(n => appsAvail().includes(n)), cadence: "daily", tier: "default", hue, look: { shape: SHAPES[hue % 4], eyes: "round", acc: "none" }, vips: [], ask: "", repoMode: "none", repoList: [], rev: 0 }; }
 export function openNew(seed) {
   if (cantSave()) return;
@@ -153,7 +153,7 @@ export async function saveBuilder(mode) {
   const fields: Record<string, any> = { voice: f.voiceName ? { name: clean(f.voiceName).slice(0, 120) } : null, repos: normRepos({ mode: f.repoMode, list: f.repoList }), name, responsibility: resp, rules, sources, cadence: CADENCE[f.cadence] ? f.cadence : "daily", tier: tierOf(f), hue: hueOf(f), look: lookOf({ id, look: f.look }), vips: (f.vips || []).slice(0, 5) };
   // an atom driven by jobs keeps its repos on its jobs
   if (jobSpec) { fields.repos = { mode: "none", list: [] }; fields.jobs = { run: jobSpec.run }; }
-  if (prev && hasJobs(prev)) delete fields.repos;
+  if (prev && jobDriven(prev)) delete fields.repos;
   let oldAsset = null, fileChanged = false;
   try {
     const file = mode === "new" ? S.formFile : S.editFile;

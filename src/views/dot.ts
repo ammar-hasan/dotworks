@@ -2,7 +2,7 @@ import { normSources, shortOf } from "../core/apps";
 import { reposLine } from "../features/repos";
 import { ICON, TIERS } from "../core/constants";
 import { $, ago, dayLabel, esc, fmtTime, fmtWhen, handleOf, headlineOf, hueOf, md, plural, reconcile } from "../core/helpers";
-import { NS, S, awake, cloudOn, curDot, hasJobs, isNarrow, jobsOf, pending, sendOK } from "../core/state";
+import { NS, S, awake, cloudOn, curDot, jobDriven, isNarrow, jobsOf, pending, sendOK } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
 import { decisionsHtml, decisionsSig, groupKey, groupOf, isDecision, jobTitle } from "../features/jobs";
 import { receiptHtml } from "../features/receipts";
@@ -15,13 +15,15 @@ import { builderHtml, draftFromDot, paintPeoplePicker } from "./builder";
 /* ─── dot view ─── */
 export function paintDot() {
   const d = curDot(); if (!d || !$("#dvName")) return;
-  const live = S.running?.dotId === d.id, cloud = awake(d), [st, cl] = dotStatus(d), jobbed = hasJobs(d), jobs = jobsOf(d);
+  const live = S.running?.dotId === d.id, cloud = awake(d), [st, cl] = dotStatus(d), jobbed = jobDriven(d), jobs = jobsOf(d);
   const avh = avatarHtml(d, { size: isNarrow() ? 40 : 56, state: stateOf(d) });
   const avb = $("#dvAv"); if (avb.dataset.sig !== avh) { avb.innerHTML = avh; avb.dataset.sig = avh; }
   $("#dvName").textContent = d.name;
   const srcs = normSources(d.sources).map(shortOf).join(" + ") || "nothing yet";
   const rl = jobbed ? (jobs.length > 2 ? `${jobTitle(jobs[0])} +${jobs.length - 1}` : jobs.map(jobTitle).join(" + ")) : reposLine(d);
-  const meta = `<span class="hd">${esc(handleOf(d))}</span><span class="${cl}">${esc(st)}</span><span class="rd">reads ${esc(srcs)}</span>${rl ? `<span class="rd">${jobbed ? "jobs" : "repos"} ${esc(rl)}</span>` : ""}`;
+  // an atom with jobs besides its own check-ins says how many
+  const more = !jobbed && jobs.length ? `<span class="rd">+ ${plural(jobs.length, "job")}</span>` : "";
+  const meta = `<span class="hd">${esc(handleOf(d))}</span><span class="${cl}">${esc(st)}</span><span class="rd">reads ${esc(srcs)}</span>${rl ? `<span class="rd">${jobbed ? "jobs" : "repos"} ${esc(rl)}</span>` : ""}${more}`;
   if ($("#dvMeta").innerHTML !== meta) $("#dvMeta").innerHTML = meta;
   // an atom driven by jobs runs them in the cloud; the others wake here with Claude
   const canRun = jobbed ? !!NS.mcp : !!NS.sample && !S.running && (S.perms as any).sample !== "denied";
@@ -72,7 +74,7 @@ export function paintChat() {
   if (!S.runsLoaded) blocks.push({ key: "loading", html: `<div data-key="loading" class="col"><div class="skel" style="width:40%"></div><div class="skel" style="height:90px"></div></div>`, sig: "l" });
   const runs = S.runs.slice().reverse(), myActs = S.actions.filter(a => a.dotId === d.id);
   if (S.runsLoaded && !runs.length && !S.running) {
-    const how = hasJobs(d) ? `My jobs are on the Jobs tab: give each a schedule and I'll run ${esc(d.jobs?.run || "them")} there in the cloud. Anything that needs your say comes to Asks first.` : "Wake me for a check-in, or just ask me something.";
+    const how = jobDriven(d) ? `My jobs are on the Jobs tab: give each a schedule and I'll run ${esc(d.jobs?.run || "them")} there in the cloud. Anything that needs your say comes to Asks first.` : "Wake me for a check-in, or just ask me something.";
     blocks.push({ key: "intro", sig: "i" + d.name + d.responsibility + hueOf(d) + JSON.stringify(lookOf(d)) + how, html: `<div class="msg dot" data-key="intro"><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${esc(handleOf(d))}</div><div class="intro-card">Hi, I'm ${esc(d.name)}. My job: ${esc(d.responsibility)} <br><br>${how}</div></div></div>` });
   }
   let lastDay = "";
@@ -150,7 +152,7 @@ export function paintComposer() {
     : src.includes("Gmail") ? ["Anything urgent?", "Is anything urgent in my inbox?"] : null;
   const voiceChip = can && canSpeak() ? `<button type="button" class="chip voice-chip" data-act="voice-toggle" aria-pressed="${!!S.voiceOn}" title="${S.voiceOn ? "Voice on: replies are read aloud" : "Turn on voice: replies are read aloud"}">${ICON.voice}Voice${S.voiceOn ? " on" : ""}</button>` : "";
   const chips = live ? `<button type="button" class="chip" data-act="stop">${ICON.stop}Stop waking</button>`
-    : can && !busy ? `<button type="button" class="chip" data-act="run" ${S.running || (hasJobs(d) && !NS.mcp) ? "disabled" : ""}>${ICON.bolt}${hasJobs(d) ? "Run its jobs" : "Wake now"}</button>${q && S.runsLoaded ? `<button type="button" class="chip" data-act="suggest" data-id="${esc(q[1])}">${esc(q[0])}</button>` : ""}${voiceChip}` : voiceChip;
+    : can && !busy ? `<button type="button" class="chip" data-act="run" ${S.running || (jobDriven(d) && !NS.mcp) ? "disabled" : ""}>${ICON.bolt}${jobDriven(d) ? "Run its jobs" : "Wake now"}</button>${q && S.runsLoaded ? `<button type="button" class="chip" data-act="suggest" data-id="${esc(q[1])}">${esc(q[0])}</button>` : ""}${voiceChip}` : voiceChip;
   const cb = $("#cmpChips"); if (cb.innerHTML !== chips) cb.innerHTML = chips;
   const att = $("#replyAtt");
   if (S.replyImage) {

@@ -900,10 +900,12 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const chatSent = (rt, msg) => rt.calls.sample.some(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === msg);
     {
       const rt = makeRuntime({ route: { dot: "dot_b", sure: true } }); two(rt);
+      rt.db.store.set(`data/users/${UID}/job_wp`, { type: "job", dotId: "dot_a", title: "Week plan", task: "Every Monday, plan my week.", repo: null, run: null, rules: [], createdAt: 3, cloud: null });
       const { w, d, errors } = await load(rt, { wait: 300 });
       ok(d.querySelector("#tell") && !d.querySelector("#tell").hidden && /Tell your atoms/.test(d.querySelector("#tellIn").placeholder), "the box is on Home");
       typeIn(w, d.querySelector("#tellIn"), "Did Sara reply about the deck?"); submit(w, d.querySelector("#tell")); await tick(500);
       ok(routeCalls(rt).length === 1 && /dot_a: "Meeting prep"/.test(routeCalls(rt)[0].input) && /dot_b: "Inbox triage"/.test(routeCalls(rt)[0].input), "Claude picks among your dots");
+      ok(/Also: Week plan: Every Monday, plan my week\./.test(routeCalls(rt)[0].input), "and knows their jobs");
       ok(text(d, "#dvName") === "Inbox triage" && chatSent(rt, "Did Sara reply about the deck?"), "lands in the right dot's chat and it replies");
       ok(d.querySelector("#tellIn") === null || d.querySelector("#tellIn").value === "", "box cleared");
       ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
@@ -1116,7 +1118,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(!rt.calls.mcp.some(c => c.tool === "fire_trigger" && c.input.text) && /2 of 3 answered/.test(text(d, "#asksList")) && /Added|Add it/.test(text(d, "#asksList .dec.done")), "answers show in the list; nothing runs until all are answered");
     await answer("act_d3", "yes");
     const fil = rt.calls.mcp.filter(c => c.tool === "fire_trigger" && c.input.text).pop();
-    ok(fil && fil.input.trigger_id === jc2.cloud.triggerId && /^Filing run/.test(fil.input.text) && fil.input.text.includes(jc.id) && fil.input.text.includes("run_c1"), "the last answer starts a filing run of that job: " + (fil?.input.text || "").slice(0, 60));
+    ok(fil && fil.input.trigger_id === jc2.cloud.triggerId && /^Follow-up run/.test(fil.input.text) && fil.input.text.includes(jc.id) && fil.input.text.includes("run_c1"), "the last answer starts a follow-up run of that job: " + (fil?.input.text || "").slice(0, 60));
     ok(rt.db.store.get(`data/users/${UID}/${jc.id}`).filing?.runId === "run_c1", "remembered, so another tab doesn't start it twice");
     ok(!rt.calls.sample.some(c => Array.isArray(c.input) && /My answer to your question/.test(c.input[c.input.length - 1]?.content || "")), "no conversation here: the job carries on in the cloud");
     ok(/carrying on with the 2 you said yes to/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "says how many it's carrying on with");
@@ -1137,12 +1139,14 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
     const det = d.querySelector(`#jobs details[data-job="${jc.id}"]`); det.open = true; det.dispatchEvent(new w.Event("toggle"));
     const ta = d.querySelector(`#jr-${jc.id}`); ta.value = "Run /catchup as operator ammar\n\nCaptures go to my Drive folder catchup/course-materials"; ta.dispatchEvent(new w.Event("input", { bubbles: true }));
-    click(w, d.querySelector(`[data-act="job-rules"][data-job="${jc.id}"]`)); await tick(60);
+    click(w, d.querySelector(`[data-act="job-save"][data-job="${jc.id}"]`)); await tick(60);
     ok(JSON.stringify(rt.db.store.get(`data/users/${UID}/${jc.id}`).rules) === JSON.stringify(["Run /catchup as operator ammar", "Captures go to my Drive folder catchup/course-materials"]), "a job keeps its own instructions, one per line");
     // add a repo, remove a job
     click(w, d.querySelector('[data-act="job-add-open"]')); await tick(60);
-    ok(d.querySelectorAll("#jb-rlist .repo-opt").length === 1 && /factory-kb/.test(text(d, "#jb-rlist")), "Add a repo lists only repos without a job");
-    click(w, d.querySelector('#jb-rlist [data-act="job-add"]')); await tick(80);
+    ok(d.querySelector('[data-act="job-kind"][data-id="command"]').getAttribute("aria-pressed") === "true" && d.querySelector("#jb-run").value === "/catchup", "Add a job on Ketchup starts as /catchup in a repo");
+    ok(d.querySelectorAll("#jb-rlist .repo-opt").length === 1 && /factory-kb/.test(text(d, "#jb-rlist")), "it lists only repos that don't run /catchup yet");
+    click(w, d.querySelector('#jb-rlist [data-act="job-pick-repo"]')); await tick(30);
+    click(w, d.querySelector('[data-act="job-add-save"]')); await tick(80);
     ok(jobsIn().length === 3 && jobsIn().some(j => j.repo === "disrupt-corpus/factory-kb" && j.run === "/catchup"), "adding a repo adds a job that runs the same command");
     click(w, d.querySelector(`[data-act="job-remove"][data-job="${jn.id}"]`)); await tick(20);
     click(w, d.querySelector(`[data-act="job-remove-yes"][data-job="${jn.id}"]`)); await tick(80);
@@ -1169,6 +1173,91 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const sq = d.querySelector("#jb-repoq"); sq.focus(); sq.value = "nar"; sq.dispatchEvent(new w.Event("input", { bubbles: true })); await tick(10);
     w.dispatchEvent(new w.Event("focus")); await tick(40);
     ok(d.activeElement === d.querySelector("#jb-repoq") && d.querySelectorAll("#jb-rlist .repo-opt").length === 1, "typing in the search survives repaints");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("30. Jobs on any atom: its own check-ins stay, plus jobs in plain words or any command");
+  {
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    const jobsIn = () => [...rt.db.store.entries()].filter(([k, v]) => v?.type === "job").map(([k, v]) => ({ id: k.split("/").pop(), ...v }));
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    ok(text(d, '#dvTabs [data-tab="schedule"]').startsWith("Schedule") && !d.querySelector("#cloud").hidden && /Keep Meeting prep awake/.test(text(d, "#cloud")), "its own schedule stays on top");
+    ok(/Give Meeting prep another job on its own schedule/.test(text(d, "#jobs")) && !!d.querySelector('#jobs [data-act="job-add-open"]'), "with Add a job underneath");
+    click(w, d.querySelector('[data-act="job-add-open"]')); await tick(30);
+    ok(d.querySelector('[data-act="job-kind"][data-id="task"]').getAttribute("aria-pressed") === "true" && !!d.querySelector("#jb-task"), "Add a job starts with something in plain words");
+    click(w, d.querySelector('[data-act="job-add-save"]')); await tick(30);
+    ok(/Say what the job should do/.test(text(d, "#jobs .err")) && jobsIn().length === 0, "it needs to know what to do");
+    typeIn(w, d.querySelector("#jb-task"), "Every Monday, look at my week and tell me which days are overloaded.");
+    typeIn(w, d.querySelector("#jb-title"), "Week plan");
+    click(w, d.querySelector('[data-act="job-add-save"]')); await tick(80);
+    const wk = jobsIn()[0];
+    ok(jobsIn().length === 1 && wk.dotId === "dot_m" && wk.title === "Week plan" && /overloaded/.test(wk.task) && !wk.repo && !wk.run, "a plain-words job: " + JSON.stringify({ title: wk?.title, task: wk?.task?.slice(0, 30) }));
+    ok(/More jobs/.test(text(d, "#jobs")) && /Week plan/.test(text(d, "#jobs .jobcard")) && /tell me which days are overloaded/.test(text(d, "#jobs .job-task")) && /\+ 1 job/.test(text(d, ".dv-meta")), "it shows under More jobs, and the header counts it");
+    ok(!rt.db.store.get(`data/users/${UID}/dot_m`).jobs, "the atom keeps its own check-ins (not job-driven)");
+    // its own schedule
+    click(w, d.querySelector(`[data-act="cloud-open"][data-job="${wk.id}"]`)); await tick(20);
+    ok(d.querySelector(`[data-cloud="when"][data-job="${wk.id}"]`).value === "weekdays", "a plain-words job starts on weekdays");
+    const ws = d.querySelector(`[data-cloud="when"][data-job="${wk.id}"]`); ws.value = "weekly"; ws.dispatchEvent(new w.Event("change", { bubbles: true })); await tick(10);
+    click(w, d.querySelector(`[data-act="cloud-create"][data-job="${wk.id}"]`)); await tick(120);
+    const cr = rt.calls.mcp.filter(c => c.tool === "create_trigger").pop();
+    ok(cr && /^Atoms · Meeting prep · Week plan · /.test(cr.input.name) && cr.input.prompt.includes(wk.id) && /\* \* 1$/.test(cr.input.cron_expression), "its own routine, Mondays: " + cr?.input.name);
+    const wk2 = rt.db.store.get(`data/users/${UID}/${wk.id}`);
+    ok(!!wk2.cloud?.triggerId && !rt.db.store.get(`data/users/${UID}/dot_m`).cloud && /Keep Meeting prep awake/.test(text(d, "#cloud")), "scheduling the job leaves the atom's own schedule alone");
+    // a command job on the same atom, any command
+    click(w, d.querySelector('[data-act="job-add-open"]')); await tick(20);
+    click(w, d.querySelector('[data-act="job-kind"][data-id="command"]')); await tick(60);
+    click(w, qa(d, '#jb-rlist [data-act="job-pick-repo"]').find(b => /course-materials/.test(b.textContent))); await tick(20);
+    typeIn(w, d.querySelector("#jb-run"), "vkf freshness");
+    click(w, d.querySelector('[data-act="job-add-save"]')); await tick(30);
+    ok(/the way you'd type it in Claude Code/.test(text(d, "#jobs .err")), "a command needs its slash");
+    typeIn(w, d.querySelector("#jb-run"), "/vkf:freshness");
+    click(w, d.querySelector('[data-act="job-add-save"]')); await tick(80);
+    const fr = jobsIn().find(j => j.run);
+    ok(fr && fr.repo === "disrupt-gt/course-materials" && fr.run === "/vkf:freshness" && jobsIn().length === 2, "any command, in any repo: " + (fr && fr.run + " in " + fr.repo));
+    ok(/\/vkf:freshness/.test(text(d, "#jobs")) && /\+ 2 jobs/.test(text(d, ".dv-meta")), "both jobs listed");
+    // Wake still wakes the atom itself, here
+    click(w, d.querySelector('#dvTabs [data-tab="chat"]')); await tick(20);
+    const fired = rt.calls.mcp.filter(c => c.tool === "fire_trigger").length;
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(500);
+    ok(rt.calls.sample.some(c => typeof c.input === "string" && /waking for a check-in/.test(c.input)) && rt.calls.mcp.filter(c => c.tool === "fire_trigger").length === fired, "Wake still wakes Meeting prep itself, here");
+    // in chat, it knows about its jobs
+    typeIn(w, d.querySelector("#reply"), "What do you do on Mondays?"); submit(w, d.querySelector("#composer")); await tick(500);
+    const chatCall = rt.calls.sample.filter(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === "What do you do on Mondays?").pop();
+    ok(chatCall && /Besides your own check-ins, you have jobs that run in the cloud/.test(chatCall.input[0].content) && /Week plan: Every Monday, look at my week/.test(chatCall.input[0].content) && /\/vkf:freshness in course-materials \(no schedule yet\)/.test(chatCall.input[0].content), "in chat it knows its jobs");
+    // a question from the plain-words job: an ordinary card, and the job carries on with the answer in the cloud
+    await rt.db.api.collection(`data/users/${UID}`).doc("act_wq").set({ type: "action", source: "cloud", dotId: "dot_m", jobId: wk.id, runId: "run_w1", state: "pending", createdAt: Date.now(), kind: "question", title: "Which day should I keep free next week?", why: "Three days are over six hours of meetings.", question: { choices: [{ id: "c1", label: "Tuesday" }, { id: "c2", label: "Wednesday" }, { id: "c3", label: "Thursday" }], allowText: true } });
+    await tick(60);
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    ok(!d.querySelector("#asksList .ask.decide") && /Which day should I keep free/.test(text(d, "#asksList")) && !!d.querySelector('#asksList input[data-edit="answer"]'), "a question with room for your own words is an ordinary card");
+    click(w, d.querySelector('#asksList [data-act="answer"][data-id="act_wq"][data-choice="c2"]')); await tick(80);
+    const fu = rt.calls.mcp.filter(c => c.tool === "fire_trigger" && c.input.text).pop();
+    ok(fu && fu.input.trigger_id === wk2.cloud.triggerId && /^Follow-up run/.test(fu.input.text) && fu.input.text.includes(wk.id), "answering it starts the job's follow-up run");
+    ok(/carrying on with your answer/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")) && !rt.calls.sample.some(c => Array.isArray(c.input) && /My answer to your question/.test(c.input[c.input.length - 1]?.content || "")), "no conversation here; the job carries on");
+    // and the atom's own wake leaves the job's answer to the job
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(500);
+    const wake = rt.calls.sample.filter(c => typeof c.input === "string" && /waking for a check-in/.test(c.input)).pop();
+    ok(wake && !/Which day should I keep free/.test(wake.input), "the atom's own wake doesn't act on the job's answer");
+    // change what the job does
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    const det = d.querySelector(`#jobs details[data-job="${wk.id}"]`); det.open = true; det.dispatchEvent(new w.Event("toggle"));
+    typeIn(w, d.querySelector(`#jt-${wk.id}`), "Every Monday, plan my week and keep one afternoon free.");
+    click(w, d.querySelector(`[data-act="job-save"][data-job="${wk.id}"]`)); await tick(60);
+    ok(rt.db.store.get(`data/users/${UID}/${wk.id}`).task === "Every Monday, plan my week and keep one afternoon free.", "a plain-words job's task can be changed");
+    // a choice that isn't yes or no stays an ordinary question, even without room for your own words
+    await rt.db.api.collection(`data/users/${UID}`).doc("act_wq2").set({ type: "action", source: "cloud", dotId: "dot_m", jobId: wk.id, runId: "run_w2", state: "pending", createdAt: Date.now(), kind: "question", title: "Which afternoon should I keep free?", why: "Both are light.", question: { choices: [{ id: "c1", label: "Tuesday" }, { id: "c2", label: "Wednesday" }], allowText: false } });
+    await tick(60);
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
+    ok(!d.querySelector("#asksList .ask.decide") && /Which afternoon should I keep free/.test(text(d, "#asksList")) && !!d.querySelector('#asksList [data-act="answer"][data-id="act_wq2"][data-choice="c1"]'), "a choice that isn't yes or no is an ordinary card too");
+    // the job's run leaves the atom's own check-ins alone, and its note shows as the atom's latest on Home
+    const own = rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt, later = Date.now() + 5000;
+    await rt.db.api.collection(`data/users/${UID}/dot_m/runs`).doc("run_wj").set({ startedAt: later, finishedAt: later + 1000, status: "done", source: "cloud", jobId: wk.id, kind: "job", text: "## Wednesday is your lightest day\n- Kept Wednesday afternoon free", steps: [], actionIds: [], thread: [] });
+    await rt.db.api.collection(`data/users/${UID}`).doc(wk.id).update({ lastRunAt: later, lastStatus: "done" });
+    await tick(80);
+    click(w, d.querySelector('#nav [data-nav="home"]')); await tick(60);
+    ok(/Latest: Wednesday is your lightest day/.test(d.querySelector('#field .orb-btn[data-id="dot_m"]')?.title || "") && rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt === own, "a job's note shows as the atom's latest on Home; its own check-ins keep their time");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");

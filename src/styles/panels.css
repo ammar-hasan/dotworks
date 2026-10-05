@@ -37,7 +37,10 @@
 .jobcard{display:flex;flex-direction:column;gap:10px}
 .job-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:15px;color:var(--ink-2)}
 .job-h b{font-weight:650;color:var(--ink)}
-.job-h b:first-child{font:500 14px var(--f-mono)}
+.job-h b.cmd{font:500 14px var(--f-mono)}
+.job-task{font-size:14px;line-height:1.5;color:var(--ink-2);max-width:70ch;margin-top:-4px}
+.job-add h3{font:700 16px/1.25 var(--f-ui);letter-spacing:-.01em}
+.job-add textarea{min-height:76px}
 .job-h .mono{font-size:12px;color:var(--muted);margin-left:2px}
 .job-more{border:1px solid var(--line);border-radius:14px;padding:10px 14px;background:var(--panel)}
 .job-more summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);list-style:none}
