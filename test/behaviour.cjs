@@ -119,6 +119,7 @@ function makeRuntime(opts = {}) {
     const by = Object.fromEntries(tools.map(t => [t.name, t]));
     const ctx = { signal: o.signal || new AbortController().signal };
     const isWake = typeof input === "string" && /waking for a check-in/.test(input);
+    const isJobRun = typeof input === "string" && /You are running one of your jobs/.test(input);
     if (isWake) flags.lastWake = input;
     if (isWake && tools.length && opts.ask) {
       flags.askTools = tools.map(t => t.name);
@@ -138,13 +139,18 @@ function makeRuntime(opts = {}) {
       await by.propose_action.execute({ kind: "rsvp", title: "Broken rsvp", why: "no event id", response: "accepted" }, ctx);
       await by.propose_action.execute({ kind: "block", title: "Focus: Q4 plan", why: "Tomorrow is packed", start: iso(864e5), end: iso(864e5 + 5400e3) }, ctx);
       try { await by.propose_action.execute({ kind: "note", title: "Fourth", why: "over the limit" }, ctx); flags.limited = false; } catch { flags.limited = true; }
+    } else if (isJobRun && tools.length) {
+      if (by.calendar_events) await by.calendar_events.execute({ days: 7 }, ctx);
+      await by.ask_owner.execute({ question: "Which afternoon should I keep free?", choices: ["Tuesday", "Wednesday"], why: "Both are light" }, ctx);
+      await by.propose_action.execute({ kind: "note", title: "Your week at a glance", why: "The Monday plan", draft: "Tue 6h, Wed 3h, Thu 7h" }, ctx);
     } else if (!isWake && Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "")) {
       flags.carried = (flags.carried || 0) + 1; flags.carriedWith = input[input.length - 1].content;
     } else if (!isWake && Array.isArray(input) && tools.length && by.propose_action) {
       await by.propose_action.execute({ kind: "rsvp", title: "Accept Dashboard review", why: "Unanswered", eventId: "e1", response: "accepted" }, ctx);
     }
     if (ctx.signal.aborted) throw { code: "cancelled", message: "stopped" };
-    const text = isWake ? "## Two things need you today\n- Sara asked about the deck — draft ready\n- Dashboard review at 17:00 — you haven't replied\n- Read https://example.com/x for context"
+    const text = isJobRun ? "## Wednesday is your lightest day\n- Tuesday and Thursday are over six hours of meetings\n- I asked which afternoon to keep free"
+      : isWake ? "## Two things need you today\n- Sara asked about the deck — draft ready\n- Dashboard review at 17:00 — you haven't replied\n- Read https://example.com/x for context"
       : Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "") ? "On it. I'll chase the pending ones first."
       : Array.isArray(input) ? "Sure — I'd keep the reply short. I queued the RSVP too." : "Things look calm.";
     for (let i = 8; i < text.length; i += 24) { if (ctx.signal.aborted) throw { code: "cancelled", message: "stopped", text: text.slice(0, i) }; o.onText?.({ text: text.slice(0, i), delta: "x" }); await tick(4); }
@@ -1227,16 +1233,19 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // in chat, it knows about its jobs
     typeIn(w, d.querySelector("#reply"), "What do you do on Mondays?"); submit(w, d.querySelector("#composer")); await tick(500);
     const chatCall = rt.calls.sample.filter(c => Array.isArray(c.input) && c.input[c.input.length - 1]?.content === "What do you do on Mondays?").pop();
-    ok(chatCall && /Besides your main job, you have jobs that run in the cloud/.test(chatCall.input[0].content) && /Week plan: Every Monday, look at my week/.test(chatCall.input[0].content) && /\/vkf:freshness in course-materials \(no schedule yet\)/.test(chatCall.input[0].content), "in chat it knows its jobs");
-    // a question from the plain-words job: an ordinary card, and the job carries on with the answer in the cloud
+    ok(chatCall && /Besides your main job, you have jobs, each on its own schedule/.test(chatCall.input[0].content) && /Week plan: Every Monday, look at my week/.test(chatCall.input[0].content) && /\/vkf:freshness in course-materials \(no schedule yet\)/.test(chatCall.input[0].content), "in chat it knows its jobs");
+    // a question from the plain-words job (here from a cloud run): an ordinary card, and answering it carries on
+    // right away, here, like the main job's questions
+    await rt.db.api.collection(`data/users/${UID}/dot_m/runs`).doc("run_w1").set({ startedAt: Date.now() - 60e3, finishedAt: Date.now() - 50e3, status: "done", source: "cloud", jobId: wk.id, kind: "job", text: "## Next week is busy\n- Three days are over six hours of meetings", steps: [], actionIds: ["act_wq"], thread: [] });
     await rt.db.api.collection(`data/users/${UID}`).doc("act_wq").set({ type: "action", source: "cloud", dotId: "dot_m", jobId: wk.id, runId: "run_w1", state: "pending", createdAt: Date.now(), kind: "question", title: "Which day should I keep free next week?", why: "Three days are over six hours of meetings.", question: { choices: [{ id: "c1", label: "Tuesday" }, { id: "c2", label: "Wednesday" }, { id: "c3", label: "Thursday" }], allowText: true } });
     await tick(60);
     click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(40);
     ok(!d.querySelector("#asksList .ask.decide") && /Which day should I keep free/.test(text(d, "#asksList")) && !!d.querySelector('#asksList input[data-edit="answer"]'), "a question with room for your own words is an ordinary card");
-    click(w, d.querySelector('#asksList [data-act="answer"][data-id="act_wq"][data-choice="c2"]')); await tick(80);
-    const fu = rt.calls.mcp.filter(c => c.tool === "fire_trigger" && c.input.text).pop();
-    ok(fu && fu.input.trigger_id === wk2.cloud.triggerId && /^Follow-up run/.test(fu.input.text) && fu.input.text.includes(wk.id), "answering it starts the job's follow-up run");
-    ok(/carrying on with your answer/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")) && !rt.calls.sample.some(c => Array.isArray(c.input) && /My answer to your question/.test(c.input[c.input.length - 1]?.content || "")), "no conversation here; the job carries on");
+    const firedBefore = rt.calls.mcp.filter(c => c.tool === "fire_trigger").length;
+    click(w, d.querySelector('#asksList [data-act="answer"][data-id="act_wq"][data-choice="c2"]')); await tick(400);
+    const goOn = rt.calls.sample.filter(c => Array.isArray(c.input) && /My answer to your question “Which day should I keep free next week\?”: Wednesday/.test(c.input[c.input.length - 1]?.content || "")).pop();
+    ok(goOn && goOn.input.some(t => /That was the note from your job “Week plan”: Every Monday/.test(t.content)), "answering it carries on right away, here, knowing which job asked");
+    ok(rt.calls.mcp.filter(c => c.tool === "fire_trigger").length === firedBefore && !!rt.db.store.get(`data/users/${UID}/act_wq`).continuedAt, "no cloud run needed, and the answer is marked as used");
     // and the atom's own wake leaves the job's answer to the job
     click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
     click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(500);
@@ -1292,6 +1301,48 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // Settings calls it its main job
     click(w, d.querySelector('#dvTabs [data-tab="settings"]')); await tick(30);
     ok(/Its main job/i.test(text(d, "#settings")), "Settings calls it its main job");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("32. Every job runs the same way: Run now on any card");
+  {
+    const rt = makeRuntime();
+    rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: ["Be brief"], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/job_w`, { type: "job", dotId: "dot_m", title: "Week plan", task: "Every Monday, look at my week and tell me which days are overloaded.", repo: null, run: null, rules: ["Count only accepted meetings"], createdAt: 2, cloud: null });
+    rt.db.store.set(`data/users/${UID}/job_c`, { type: "job", dotId: "dot_m", title: "course-materials", repo: "disrupt-gt/course-materials", run: "/vkf:freshness", task: null, rules: [], createdAt: 3, cloud: null });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(30);
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    const btn = id => d.querySelector(`[data-act="job-run"][data-job="${id}"]`);
+    ok(!!d.querySelector('#mainJob [data-act="main-run"]') && !!btn("job_w") && !!btn("job_c"), "every job has Run now, in the same place");
+    ok(!btn("job_w").disabled && btn("job_c").disabled && /schedule first/.test(btn("job_c").title), "a repo command waits for a schedule: it runs in the cloud");
+    // a plain-words job runs here, like the main job
+    click(w, btn("job_w")); await tick(700);
+    const jp = rt.calls.sample.filter(c => typeof c.input === "string" && /You are running one of your jobs/.test(c.input)).pop();
+    ok(jp && /"Week plan"/.test(jp.input) && /which days are overloaded/.test(jp.input) && /Count only accepted meetings/.test(jp.input) && /Look at my meetings/.test(jp.input), "a plain-words job runs here, with its task and its rules");
+    const entries = () => [...rt.db.store.entries()];
+    const [jrKey, jr] = entries().find(([k, v]) => k.startsWith(`data/users/${UID}/dot_m/runs/`) && v?.jobId === "job_w") || [];
+    ok(jr && jr.kind === "job" && jr.source === "page" && /Wednesday is your lightest day/.test(jr.text), "its note is the job's");
+    const asked = entries().filter(([k, v]) => v?.type === "action" && v.dotId === "dot_m");
+    ok(asked.length === 2 && asked.every(([k, v]) => v.jobId === "job_w"), "what it asks says which job asked");
+    ok(!!rt.db.store.get(`data/users/${UID}/job_w`).lastRunAt && !rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt, "the job's time moves, not the main job's");
+    const rid = jrKey && jrKey.split("/").pop();
+    ok(/Week plan/.test(text(d, `#msgs [data-key="note:${rid}"] .m-meta`)) && /ran here/.test(text(d, `#msgs [data-key="note:${rid}"] .m-meta`)), "in Chat, the note says which job ran, and where");
+    // answering its question carries on here, right away
+    const qid = asked.find(([k, v]) => v.kind === "question")[0].split("/").pop();
+    click(w, d.querySelector(`[data-act="answer"][data-id="${qid}"][data-choice="c2"]`)); await tick(400);
+    ok(rt.calls.sample.some(c => Array.isArray(c.input) && /My answer to your question “Which afternoon should I keep free\?”: Wednesday/.test(c.input[c.input.length - 1]?.content || "")) && !rt.calls.mcp.some(c => c.tool === "fire_trigger"), "answering its question carries on here, right away");
+    // a repo command: the same button, once it has a schedule, runs it in the cloud
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    click(w, d.querySelector('[data-act="cloud-open"][data-job="job_c"]')); await tick(20);
+    click(w, d.querySelector('[data-act="cloud-create"][data-job="job_c"]')); await tick(150);
+    const tc = rt.db.store.get(`data/users/${UID}/job_c`).cloud;
+    ok(!!tc?.triggerId && !btn("job_c").disabled && !d.querySelector('[data-act="cloud-fire"][data-job="job_c"]'), "scheduled, its Run now works, and its schedule card doesn't repeat it");
+    click(w, btn("job_c")); await tick(150);
+    ok(rt.calls.mcp.some(c => c.tool === "fire_trigger" && c.input.trigger_id === tc.triggerId) && /course-materials is running in the cloud\. Its note lands in Chat\./.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "a repo command runs in the cloud, and says so");
+    // the main job's Run now is Wake
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    click(w, d.querySelector('#mainJob [data-act="main-run"]')); await tick(600);
+    ok(rt.calls.sample.some(c => typeof c.input === "string" && /waking for a check-in/.test(c.input)) && !!rt.db.store.get(`data/users/${UID}/dot_m`).lastRunAt, "the main job's Run now wakes it, here");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");

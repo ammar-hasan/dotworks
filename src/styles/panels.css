@@ -36,6 +36,7 @@
 .jobcard{display:flex;flex-direction:column;gap:10px}
 .job-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:15px;color:var(--ink-2)}
 .job-h b{font-weight:650;color:var(--ink)}
+.job-h .btn{align-self:center}
 .job-h b.cmd{font:500 14px var(--f-mono)}
 .job-task{font-size:14px;line-height:1.5;color:var(--ink-2);max-width:70ch;margin-top:-4px}
 .job-add h3{font:700 16px/1.25 var(--f-ui);letter-spacing:-.01em}

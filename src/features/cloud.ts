@@ -1,10 +1,10 @@
 import { normSources } from "../core/apps";
-import { FIX, SRV, TZ } from "../core/constants";
+import { FIX, ICON, SRV, TZ } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clamp, clean, cssKey, esc, fmtWhen, hueOf, pad, toast, upsertLocal } from "../core/helpers";
-import { NS, S, artifactUrl, cloudOn, connPerm, curDot, jobDriven, jobsOf, userDoc } from "../core/state";
+import { NS, S, artifactUrl, canRunHere, cloudOn, connPerm, curDot, jobDriven, jobsOf, userDoc } from "../core/state";
 import { renderAll } from "../ui/shell";
-import { jobTitle, paintJobs } from "./jobs";
+import { isCommandJob, jobTitle, paintJobs } from "./jobs";
 
 /* ─── cloud: an atom (or one of its jobs) that wakes on its own, through a routine (Claude's scheduled tasks) ───
    Each atom, and each of an atom's jobs, gets its own routine, made from this page. Two platform rules shape this file:
@@ -88,7 +88,11 @@ function mainJobHtml(d, on: boolean) {
   const busy = S.busy["ci:" + d.id] ? "disabled" : "";
   if (!on) return `<div class="job-h"><b>Main job</b></div><p class="job-task">Off: ${esc(d.name)} only does the jobs below. <button type="button" class="link" data-act="checkins-on" ${busy}>Turn it on</button></p>`;
   const resp = clean(d.responsibility || "").replace(/\s+/g, " ").trim(), short = resp.length > 170 ? resp.slice(0, 168).replace(/\s+\S*$/, "") + "…" : resp;
-  return `<div class="job-h"><b>Main job</b></div><p class="job-task">Whenever it wakes${resp ? `: ${esc(short)}` : "."}</p>`;
+  // Run now, as on every job: here with Claude, else in the cloud on its schedule
+  const here = canRunHere(), running = S.running?.dotId === d.id && !S.running.jobId, firing = firingFor(subOf(d));
+  const ok = here ? !S.running : cloudOn(d) && !!NS.mcp && !firing;
+  const run = `<button type="button" class="btn sm" data-act="main-run" title="${here ? "Run it here now" : cloudOn(d) ? "Run it now in the cloud" : "Running it here needs Claude in this view"}" ${ok ? "" : "disabled"}>${ICON.bolt}${running ? "Running…" : firing ? "Running in the cloud…" : "Run now"}</button>`;
+  return `<div class="job-h"><b>Main job</b><span class="grow"></span>${run}</div><p class="job-task">Whenever it wakes${resp ? `: ${esc(short)}` : "."}</p>`;
 }
 function mainMoreHtml(d) {
   const nm = esc(d.name), asking = !!S.jobOpen["ci:" + d.id], open = asking || !!S.jobOpen["main:" + d.id], busy = S.busy["ci:" + d.id] ? "disabled" : "";
@@ -128,7 +132,7 @@ export function paintCloudBox(s: Sub, box) {
         <p class="note">${firing ? (j ? "Running now. Its note appears in Chat when it's done." : "Waking now. Its note appears in Chat in a few minutes.") : idle}</p>
         ${appsStep}
         ${t.mode && t.mode !== "auto" ? `<p class="fine">Its runs pause to ask before ${j ? "they run commands or save" : "saving notes"}. To let it run on its own, turn on <b>Automatically approve</b> for “${esc(t.name || "this task")}” in Claude's scheduled tasks.</p>` : ""}
-        <div class="row">${t.enabled ? `<button class="btn sm" data-act="cloud-fire"${ja} ${busy || firing ? "disabled" : ""}>${j ? "Run now" : "Wake in the cloud now"}</button>` : ""}<button class="btn ghost sm" data-act="${t.enabled ? "cloud-pause" : "cloud-resume"}"${ja} ${busy ? "disabled" : ""}>${t.enabled ? "Pause" : "Resume"}</button><button class="btn ghost sm danger" data-act="cloud-sleep"${ja} ${busy ? "disabled" : ""}>${j ? "Stop the schedule" : "Let it sleep"}</button></div>${errLine}`);
+        <div class="row">${t.enabled && !(j && isCommandJob(j)) ? `<button class="btn ghost sm" data-act="cloud-fire"${ja} ${busy || firing ? "disabled" : ""}>Run it in the cloud now</button>` : ""}<button class="btn ghost sm" data-act="${t.enabled ? "cloud-pause" : "cloud-resume"}"${ja} ${busy ? "disabled" : ""}>${t.enabled ? "Pause" : "Resume"}</button><button class="btn ghost sm danger" data-act="cloud-sleep"${ja} ${busy ? "disabled" : ""}>${j ? "Stop the schedule" : "Let it sleep"}</button></div>${errLine}`);
     }
   } else if (rec.cloudPending && Date.now() - (rec.cloudPending.at || 0) < 6 * 3600e3) {
     // the create may have gone through even though its answer got lost

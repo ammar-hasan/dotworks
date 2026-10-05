@@ -1,7 +1,7 @@
 import { appUsable, humanTool, kindOf, shortOf, toolsOf } from "../core/apps";
 import { carryOn, emailsOf } from "../ai/flow";
 import { answerText, questionOf, questionPlan } from "./questions";
-import { afterJobAnswer, decisionsHtml, decisionsSig, groupKey, groupOf, isDecision, isJobQuestion } from "./jobs";
+import { afterJobAnswer, decisionsHtml, decisionsSig, groupKey, groupOf, isCommandJob, isDecision, isJobQuestion } from "./jobs";
 import { canUndo, inverseOf, receiptHtml, receiptOf, snapshotForUndo, undoAction } from "./receipts";
 import { loadSchema, schemaOf } from "../ai/schemas";
 import { FIX, ICON, KINDS, RSVP, SRV, TZ } from "../core/constants";
@@ -208,8 +208,9 @@ export async function answerQuestion(id: string, choiceId: string) {
   delete S.busy[id];
   if (!ok) { renderAll(); return; }
   delete S.edits[id]; cheer(a.dotId); renderAll();
-  // a job's question: the job carries on in the cloud once all of that run's questions are answered
-  if (isJobQuestion(a)) { afterJobAnswer({ ...a, answer, state: "done" }); return; }
+  // a job's question carries on here like the main job's; a job that runs a command in a repo carries on in the
+  // cloud instead, once all of that run's questions are answered
+  if (isJobQuestion(a)) { const j = S.jobs.find(x => x.id === a.jobId); if (!j || isCommandJob(j)) { afterJobAnswer({ ...a, answer, state: "done" }); return; } }
   const d = S.dots.find(x => x.id === a.dotId);
   if (d) carryOn(d, { ...a, answer, state: "done" });
 }

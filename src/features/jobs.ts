@@ -1,7 +1,8 @@
 import { ICON } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clean, cssKey, esc, hueOf, newId, plural, toast, upsertLocal } from "../core/helpers";
-import { NS, S, cloudOn, curDot, jobDriven, jobsOf, upsertDocLocal, userDoc } from "../core/state";
+import { NS, S, canRunHere, cloudOn, curDot, jobDriven, jobsOf, upsertDocLocal, userDoc } from "../core/state";
+import { runDot } from "../ai/flow";
 import { avatarHtml } from "../ui/characters";
 import { openDot } from "../ui/nav";
 import { renderAll } from "../ui/shell";
@@ -10,16 +11,20 @@ import { cloudAct, firingFor, paintCloudBox, subOf } from "./cloud";
 import { questionOf } from "./questions";
 
 /* ─── jobs ───
-   A job is one more thing an atom does, on its own schedule in the cloud. Any atom can have jobs. A job is either
-   - a command in one of your repos (like /catchup in course-materials), run under the repo's own rules, or
-   - a task in plain words (like "every Monday, plan my week"), done the way the atom's own wake works.
-   Each job has its own scheduled task, notes and asks. An atom marked with `jobs` ({run}) is driven by its jobs only
-   (Ketchup): it has no schedule of its own, and a new job runs that command unless you say otherwise.
+   A job is one more thing an atom does besides its main job. Any atom can have jobs, and every job works the same
+   way as the main job: Run now runs it, a schedule runs it on its own, its note lands in Chat, and anything that
+   needs your say comes to Asks. A job is either
+   - a task in plain words (like "every Monday, plan my week"): it runs here with the atom's apps, like the main job,
+     and in the cloud on its schedule; or
+   - a command in one of your repos (like /catchup in course-materials): it needs the repo, so it always runs in the
+     cloud, under the repo's own rules.
+   An atom marked with `jobs` ({run}) has its main job off (Ketchup): it only does its jobs.
    Stored as their own documents: data/users/<you>/<jobId> {type: "job", dotId, title, repo?, run?, task?, rules, cloud, …}.
 
-   A job never waits for you in the middle of a run: whatever needs your say becomes a question in Asks. Simple
-   choices ("decisions") show as one short list per run. When you've answered all of a run's questions, this page
-   starts a short follow-up run of that job, which carries on with what you said (config/runbook.md, JOBS). */
+   Answering a plain-words job's question carries on at once, like the main job's. A command job never waits for you
+   in the middle of a run: whatever needs your say becomes a yes-or-no question ("decisions": one short list per run),
+   and when you've answered a run's questions, this page starts a short follow-up run of that job in the cloud
+   (config/runbook.md, JOBS). */
 
 export const RUN_RE = /^\/[A-Za-z][\w:.-]{0,40}$/;
 export const jobSpecOf = x => (x && typeof x === "object" && RUN_RE.test(String(x.run || "")) ? { run: String(x.run) } : null);
@@ -85,13 +90,29 @@ export async function setCheckins(d, on: boolean) {
   finally { delete S.busy[k]; renderAll(); }
 }
 
-/* Run now on an atom driven by jobs: run each scheduled job now, in the cloud (a page can't run a repo's command) */
+/* Run now on one job. A plain-words job runs here, like the main job. A job that runs a command in a repo needs the
+   repo, so it runs in the cloud; so does any job with a schedule when this view can't use Claude. */
+export async function runJob(d, j) {
+  if (!isCommandJob(j) && canRunHere()) return runDot(d.id, j.id);
+  if (!cloudOn(j)) { toast(isCommandJob(j) ? `Give ${jobTitle(j)} a schedule first: it works in your repo, so it runs in the cloud.` : `Running ${jobTitle(j)} here needs Claude in this view. Give it a schedule to run it in the cloud.`); return "skip"; }
+  if (await cloudAct("fire", subOf(d, j), { quiet: true })) toast(`${jobTitle(j)} is running in the cloud. Its note lands in Chat.`);
+  return "skip";
+}
+/* Run now on the main job: here with Claude, or in the cloud on its schedule when this view can't use Claude */
+export function runMain(d) {
+  if (canRunHere() || !cloudOn(d)) return runDot(d.id);
+  return cloudAct("fire", subOf(d));
+}
+/* Run now on an atom whose main job is off: each of its jobs, the way that job runs */
 export async function runJobs(d) {
-  const jobs = jobsOf(d), live = jobs.filter(cloudOn);
-  if (!live.length) { toast(jobs.length ? "Give its jobs a schedule first: they run in the cloud." : "It has no jobs yet. Add one on the Jobs tab."); S.tab = "schedule"; renderAll(); return; }
+  const jobs = jobsOf(d);
+  if (!jobs.length) { toast("It has no jobs yet. Add one on the Jobs tab."); S.tab = "schedule"; renderAll(); return; }
+  const here = jobs.filter(j => !isCommandJob(j) && canRunHere()), cloud = jobs.filter(j => !here.includes(j) && cloudOn(j));
   let n = 0;
-  for (const j of live) if (await cloudAct("fire", subOf(d, j), { quiet: true })) n++;
-  toast(n ? `${d.name} is running ${n === 1 ? jobTitle(live[0]) : plural(n, "job")} in the cloud` : "Couldn't start it. Check the Jobs tab.");
+  for (const j of cloud) if (await cloudAct("fire", subOf(d, j), { quiet: true })) n++;
+  if (n) toast(`${d.name} is running ${n === 1 ? jobTitle(cloud[0]) : plural(n, "job")} in the cloud`);
+  else if (!here.length) { toast(cloud.length ? "Couldn't start it. Check the Jobs tab." : "Give its jobs a schedule first: a job that works in a repo runs in the cloud."); S.tab = "schedule"; renderAll(); return; }
+  for (const j of here) { const st = await runDot(d.id, j.id); if (st !== "done" && st !== "truncated") break; }
 }
 
 /* ─── an atom's other jobs, on its Jobs tab (its main job is the first card, above them: cloud.ts) ─── */
@@ -104,14 +125,21 @@ export function paintJobs(d, box) {
   const html = `<div class="jobs">${jobs.map(j => jobCardHtml(d, j)).join("")}</div>${empty}${addBox}`;
   // repaint only when something structural changes, never because of what's being typed
   const f = S.jobDraft[d.id], opens = Object.entries(S.jobOpen).filter(([k]) => !/^(q|ci|main):/.test(k));
-  const sig = JSON.stringify([d.name, d.jobs, jobs.map(j => [j.id, j.title, j.repo, j.run, j.task, j.rules, cloudOn(j)]), opens, add ? [f?.kind, f?.repo] : 0, !!S.repos, S.reposErr, S.errs["jobadd:" + d.id] || ""]);
+  const sig = JSON.stringify([d.name, d.jobs, jobs.map(j => [j.id, j.title, j.repo, j.run, j.task, j.rules, cloudOn(j), firingFor(subOf(d, j))]), opens, add ? [f?.kind, f?.repo] : 0, !!S.repos, S.reposErr, S.errs["jobadd:" + d.id] || "", !!S.running, S.running?.jobId || "", canRunHere(), !!NS.mcp]);
   if (box.dataset.sig !== sig) { box.innerHTML = html; box.dataset.sig = sig; }
   for (const j of jobs) paintCloudBox(subOf(d, j), $(`#cloud-${cssKey(j.id)}`));
 }
+// Run now, in the same place on every job: here when it can, in the cloud when it needs to be there
+function runBtn(d, j) {
+  const cmd = isCommandJob(j), cloud = cmd || !canRunHere(), running = S.running?.jobId === j.id, firing = firingFor(subOf(d, j));
+  const ok = cloud ? cloudOn(j) && !!NS.mcp && !firing : !S.running;
+  const title = cloud ? (cloudOn(j) ? (cmd ? "Run it now in the cloud: it works in your repo" : "Run it now in the cloud") : cmd ? "Give it a schedule first: it works in your repo, so it runs in the cloud" : "Running it here needs Claude in this view") : "Run it here now";
+  return `<button type="button" class="btn sm" data-act="job-run" data-job="${esc(j.id)}" title="${esc(title)}" ${ok ? "" : "disabled"}>${ICON.bolt}${running ? "Running…" : firing ? "Running in the cloud…" : "Run now"}</button>`;
+}
 function jobCardHtml(d, j) {
   const k = cssKey(j.id), id = esc(j.id), more = S.jobOpen[j.id], rules = j.rules || [], cmd = isCommandJob(j);
-  const head = cmd ? `<div class="job-h"><b class="cmd">${esc(j.run)}</b><span>in</span><b>${esc(jobTitle(j))}</b><span class="mono">${esc(j.repo)}</span></div>`
-    : `<div class="job-h"><b>${esc(jobTitle(j))}</b></div><p class="job-task">${esc(j.task || "")}</p>`;
+  const head = cmd ? `<div class="job-h"><b class="cmd">${esc(j.run)}</b><span>in</span><b>${esc(jobTitle(j))}</b><span class="mono">${esc(j.repo)}</span><span class="grow"></span>${runBtn(d, j)}</div>`
+    : `<div class="job-h"><b>${esc(jobTitle(j))}</b><span class="grow"></span>${runBtn(d, j)}</div><p class="job-task">${esc(j.task || "")}</p>`;
   const taskEdit = cmd ? "" : `<label class="eyebrow" for="jt-${k}">What it does</label><textarea id="jt-${k}" data-jobtask="${id}" maxlength="900">${esc(S.edits["jobtask:" + j.id] ?? j.task ?? "")}</textarea>`;
   return `<article class="jobcard" data-key="${id}">${head}
     <section class="card cloud-card" id="cloud-${k}"></section>
@@ -137,10 +165,10 @@ function addFormHtml(d) {
     ? `<span class="eyebrow">Repo</span>${f.repo ? `<div class="people"><span class="person repo-chip"><span>${esc(f.repo)}</span><button type="button" data-act="job-unpick-repo" aria-label="Pick another repo">×</button></span></div>`
         : `<input type="text" id="jb-repoq" data-jobq="1" value="${esc(f.q || "")}" placeholder="Search your repos" autocomplete="off"><div class="repo-list" id="jb-rlist">${jobRepoList(d)}</div>`}
       <label class="eyebrow" for="jb-run">Command</label><input type="text" id="jb-run" data-jobf="run" value="${esc(f.run || "")}" placeholder="/catchup" autocomplete="off" spellcheck="false">
-      <span class="note">It runs this command in the repo, in the cloud, under the repo's own rules. Anything that needs your say comes to Asks first.</span>`
+      <span class="note">It needs the repo, so it always runs in the cloud, under the repo's own rules. Anything that needs your say comes to Asks first.</span>`
     : `<label class="eyebrow" for="jb-task">What should it do?</label><textarea id="jb-task" data-jobf="task" maxlength="900" placeholder="Every Monday, look at my week and tell me which days are overloaded.">${esc(f.task || "")}</textarea>
       <label class="eyebrow" for="jb-title">Name · optional</label><input type="text" id="jb-title" data-jobf="title" maxlength="40" value="${esc(f.title || "")}" placeholder="Week plan">
-      <span class="note">It does this with ${esc(d.name)}'s apps${(d.sources || []).length ? "" : " (it has none yet)"}, on its own schedule, and leaves its note in Chat.</span>`;
+      <span class="note">It does this with ${esc(d.name)}'s apps${(d.sources || []).length ? "" : " (it has none yet)"}, like its main job: run it any time, or give it a schedule. Its note lands in Chat.</span>`;
   return `<div class="card job-add"><h3>Add a job</h3><div class="chips">${chip("task", "Something in plain words")}${chip("command", "A command in a repo")}</div>${body}
     ${err ? `<p class="err">${esc(err)}</p>` : ""}
     <div class="row"><button class="btn pri sm" data-act="job-add-save">Add job</button><button class="btn ghost sm" data-act="job-add-close">Cancel</button></div></div>`;

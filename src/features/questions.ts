@@ -51,6 +51,10 @@ export function answerText(a, choiceId): string {
   return q.choices.find(c => c.id === choiceId)?.label || "";
 }
 
+// a job's answers it hasn't acted on yet: they go into that job's next run
+export const jobAnswers = j => S.actions
+  .filter(a => a.jobId === j.id && a.kind === "question" && a.state === "done" && a.answer?.text && !a.continuedAt)
+  .sort((x, y) => (y.answer.at || 0) - (x.answer.at || 0)).slice(0, 5);
 // answers a dot hasn't acted on yet, newest first: they go into its next wake
 // (a job's questions belong to that job: it acts on them in the cloud)
 export const openAnswers = d => S.actions

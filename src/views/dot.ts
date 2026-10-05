@@ -65,7 +65,7 @@ export function noteBlock(r, d) {
   ].join("");
   // a note from one of its jobs says which one
   const job = r.jobId ? S.jobs.find(j => j.id === r.jobId) : null, jobTag = r.jobId ? `<span class="job-tag">${esc(job ? jobTitle(job) : "a job")}</span> · ` : "";
-  return `<div class="msg dot" data-key="note:${esc(r.id)}" data-comment-target><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${jobTag}${esc(fmtTime(r.startedAt))} · ${r.source === "cloud" ? `<span class="cloud-tag">${r.jobId ? "ran in the cloud" : "woke in the cloud"}</span>` : "woke here"}${esc(tierNote)}</div>${steps}${r.text ? `<div class="letter">${md(r.text)}</div>` : ""}${status}${acts ? `<div class="m-acts">${acts}</div>` : ""}</div></div>`;
+  return `<div class="msg dot" data-key="note:${esc(r.id)}" data-comment-target><span class="m-av">${avatarHtml(d, { size: 30 })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${jobTag}${esc(fmtTime(r.startedAt))} · ${r.source === "cloud" ? `<span class="cloud-tag">${r.jobId ? "ran in the cloud" : "woke in the cloud"}</span>` : r.jobId ? "ran here" : "woke here"}${esc(tierNote)}</div>${steps}${r.text ? `<div class="letter">${md(r.text)}</div>` : ""}${status}${acts ? `<div class="m-acts">${acts}</div>` : ""}</div></div>`;
 }
 export function paintChat() {
   const box = $("#msgs"), d = curDot(); if (!box || !d) return;
@@ -95,8 +95,8 @@ export function paintChat() {
   }
   for (const a of myActs.filter(a => a.state === "pending" && !shown.has(a.id)).reverse()) blocks.push(isDecision(a) ? decisionBlock(a, shown) : askBlock(a));
   if (S.running?.dotId === d.id) {
-    const lv = S.running;
-    blocks.push({ key: "live", sig: JSON.stringify([lv.steps, lv.text]), html: `<div class="msg dot" data-key="live"><span class="m-av">${avatarHtml(d, { size: 30, state: stateOf(d) })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · awake now</div>${threadHtml(lv.steps)}${lv.text ? `<div class="letter">${md(lv.text)}</div>` : `<div class="typing"><i></i><i></i><i></i><span>${lv.steps.length ? "putting the note together" : "waking up — the first time, Claude asks you to allow it and the apps it reads"}</span></div>`}</div></div>` });
+    const lv = S.running, lj = lv.jobId ? S.jobs.find(j => j.id === lv.jobId) : null;
+    blocks.push({ key: "live", sig: JSON.stringify([lv.steps, lv.text, lv.jobId]), html: `<div class="msg dot" data-key="live"><span class="m-av">${avatarHtml(d, { size: 30, state: stateOf(d) })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${lv.jobId ? `<span class="job-tag">${esc(lj ? jobTitle(lj) : "a job")}</span> · running now` : "awake now"}</div>${threadHtml(lv.steps)}${lv.text ? `<div class="letter">${md(lv.text)}</div>` : `<div class="typing"><i></i><i></i><i></i><span>${lv.steps.length ? "putting the note together" : "waking up — the first time, Claude asks you to allow it and the apps it reads"}</span></div>`}</div></div>` });
   } else if (cloudFiringFor(d)) {
     blocks.push({ key: "firing", sig: "f", html: `<div class="msg dot" data-key="firing"><span class="m-av">${avatarHtml(d, { size: 30, state: "live cloud" })}</span><div class="m-body"><div class="typing"><i></i><i></i><i></i><span>waking in the cloud — its note lands here in a few minutes</span></div></div></div>` });
   }

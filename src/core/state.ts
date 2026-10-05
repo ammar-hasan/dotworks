@@ -43,5 +43,7 @@ export const isDue = d => !cloudOn(d) && !jobDriven(d) && (!d.lastRunAt || Date.
 export const dueDots = () => S.dots.filter(isDue);
 // a change to an atom or job document, shown at once (the store's echo follows)
 export function upsertDocLocal(id: string, fields: Record<string, any>) { for (const arr of [S.dots, S.jobs]) { const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = { ...arr[i], ...fields }; } }
+// a job (or the main job) runs here when Claude is available in this view; otherwise only in the cloud
+export const canRunHere = () => !!NS.sample && (S.perms as any).sample !== "denied";
 export const sendOK = (mode = "stage") => S.canSend === "available" || (mode === "send" && S.canSend === "available_if_summoned");
 export const connPerm = server => S.perms["mcp:" + server];

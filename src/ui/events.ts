@@ -11,7 +11,7 @@ import { answerQuestion, execute, setActionState, undoAction } from "../features
 import { deliver, newDotFrom, paintTell, tellDots } from "../features/tell";
 import { cancelAutoSend, dictationPaused, listen, setVoiceMode, speak, stopListening, stopSpeaking } from "../features/voice";
 import { cloudAct, cloudCreate, cloudFind, cloudPlan, loadTriggers, paintCloud, subOf } from "../features/cloud";
-import { curJob, jobDraft, jobRepoList, removeJob, runJobs, saveJob, saveNewJob, setCheckins } from "../features/jobs";
+import { curJob, jobDraft, jobRepoList, removeJob, runJob, runJobs, runMain, saveJob, saveNewJob, setCheckins } from "../features/jobs";
 import { deleteDot } from "../features/delete";
 import { allow, closeAcct, renderAcct } from "./account";
 import { lookOf } from "./characters";
@@ -132,7 +132,10 @@ document.addEventListener("click", ev => {
     case "cloud-resume": { const s = sub(); if (s) cloudAct("resume", s); break; }
     case "cloud-sleep": { const s = sub(); if (s) cloudAct("sleep", s); break; }
     case "cloud-create": { const s = sub(); if (s) cloudCreate(s); break; }
-    // check-ins on or off
+    // Run now, on any job's card
+    case "main-run": if (d) runMain(d); break;
+    case "job-run": if (d && job) runJob(d, job); break;
+    // the main job (internally "check-ins") on or off
     case "checkins-off": if (d) { S.jobOpen["ci:" + d.id] = true; paintCloud(); } break;
     case "checkins-off-no": if (d) { delete S.jobOpen["ci:" + d.id]; paintCloud(); } break;
     case "checkins-off-yes": if (d) { delete S.jobOpen["ci:" + d.id]; setCheckins(d, false); } break;
