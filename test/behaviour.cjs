@@ -94,7 +94,7 @@ function makeRuntime(opts = {}) {
     { id: "focus-guard", name: "Focus guard", responsibility: "Protect focus time.", rules: [], sources: ["calendar"], cadence: "daily", tier: "quick", hue: 268, look: { shape: "blob", eyes: "happy", acc: "shades" }, createdAt: 2 },
   ] });
   if (!opts.noAppUrl) db.store.set("meta/app", { url: "https://claude.ai/artifact/TestDotworks01" });
-  const triggers = [];
+  const triggers = (opts.triggers || []).map(t => clone(t));
   const perms = { sample: "granted", db: "granted", user: "granted", room: "granted", "mcp:Google Calendar": "granted", "mcp:Gmail": "prompt", "mcp:Claude Code Remote": "granted", mcp: "prompt", ...(opts.perms || {}) };
   const checkOpts = o => {
     if (o === undefined) return;
@@ -160,6 +160,9 @@ function makeRuntime(opts = {}) {
       await by.propose_action.execute({ kind: "note", title: "Your week at a glance", why: "The Monday plan", draft: "Tue 6h, Wed 3h, Thu 7h" }, ctx);
     } else if (!isWake && Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "")) {
       flags.carried = (flags.carried || 0) + 1; flags.carriedWith = input[input.length - 1].content;
+    } else if (!isWake && Array.isArray(input) && /running|sessions/i.test(input[input.length - 1]?.content || "")) {
+      flags.chatTools = tools.map(t => t.name); flags.chatContext = input[0].content;
+      if (by.claude_runs) flags.runs = await by.claude_runs.execute({}, ctx);
     } else if (!isWake && Array.isArray(input) && tools.length && by.remember && /remember/i.test(input[input.length - 1]?.content || "")) {
       flags.chatTools = tools.map(t => t.name);
       flags.remembered = await by.remember.execute({ text: "Prefers short replies", kind: "preference" }, ctx);
@@ -1431,7 +1434,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // tell another atom in chat: it remembers too
     click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(60);
     typeIn(w, d.querySelector("#reply"), "remember that I like short replies"); submit(w, d.querySelector("#composer")); await tick(400);
-    ok(rt.flags.chatTools?.includes("remember") && !rt.flags.chatTools.includes("suggest_memory") && !rt.flags.chatTools.includes("recent_activity"), "any atom can keep what you tell it; only the super atom suggests things");
+    ok(rt.flags.chatTools?.includes("remember") && !rt.flags.chatTools.includes("suggest_memory") && !rt.flags.chatTools.includes("recent_activity") && !rt.flags.chatTools.includes("claude_runs"), "any atom can keep what you tell it; only the super atom suggests things or looks at Claude's runs");
     ok(mems().some(m => m.text === "Prefers short replies" && m.status === "confirmed" && m.by === "dot_m") && /Remembered: Prefers short replies/.test(toasts()), "kept, and it says so");
     // every atom's wake carries what you told it, and an ask says which it follows
     click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(700);
@@ -1540,6 +1543,43 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector('#dvTabs [data-tab="chat"]')); await tick(1100);
     ok((rt.db.store.get(`data/users/${UID}/reads`)?.at || {}).dot_m > 0, "opening an atom's chat marks its notes read");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("37. The super atom can say what Claude runs for you on a schedule, and where your other sessions are");
+  {
+    const run = (status, fired, ended, sid, extra = {}) => ({ status: "ROUTINE_RUN_STATUS_" + status, fired_at: iso(fired), ...(ended !== null ? { finished_at: iso(ended) } : {}), session_id: sid, failure_reason: "ROUTINE_RUN_FAILURE_REASON_UNSPECIFIED", ...extra });
+    const triggers = [
+      { id: "trig_lead", name: "Atoms · Friday · 7co2", enabled: true, next_run_at: iso(2 * 3600e3), last_run: run("SUCCEEDED", -3600e3, -3540e3, "cse_01LeadRun0001xyz"), derived_state: { prompt: "Wake atom dot_l" } },
+      { id: "trig_learn", name: "Atoms · Friday · Learn from what I do · zfud", enabled: true, next_run_at: iso(20 * 3600e3), last_run: run("SUCCEEDED", -5 * 3600e3, -5 * 3600e3 + 40e3, "cse_01LearnRun001abc") },
+      { id: "trig_m", name: "Dotworks · Meet Buddy · oh66", enabled: true, next_run_at: iso(9 * 3600e3), last_run: run("FAILED", -26 * 3600e3, -26 * 3600e3 + 30e3, "cse_01MeetRun0001xyz", { failure_reason: "ROUTINE_RUN_FAILURE_REASON_SESSION_ERROR" }) },
+      { id: "trig_brief", name: "Daily agentic AI brief (hub video)", enabled: true, next_run_at: iso(10 * 3600e3), last_run: run("RUNNING", -12 * 60e3, null, "cse_01BriefRun001xyz"), derived_state: { prompt: "/world:daily-brief SECRET-PROMPT" } },
+      { id: "trig_stale", name: "Weekly audit", enabled: true, next_run_at: iso(30 * 3600e3), last_run: run("UNSPECIFIED", -30 * 3600e3, null, "cse_01StaleRun001xyz") },
+      { id: "trig_old", name: "Daily Slack Insights", enabled: false, next_run_at: iso(-50 * 864e5), last_run: run("SUCCEEDED", -50 * 864e5, -50 * 864e5 + 60e3, "cse_01OldRun00001xyz") },
+    ];
+    const rt = makeRuntime({ triggers });
+    rt.db.store.set(`data/users/${UID}/dot_l`, { type: "dot", role: "lead", name: "Friday", responsibility: "Brief me.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 42, look: { shape: "orb", eyes: "wide", acc: "none", orbits: "three" }, createdAt: 1, lastRunAt: null, cloud: { triggerId: "trig_lead", say: "Every 3 hours", since: 1 } });
+    rt.db.store.set(`data/users/${UID}/job_l1`, { type: "job", dotId: "dot_l", title: "Learn from what I do", task: "Learn.", rules: [], learn: true, createdAt: 2, cloud: { triggerId: "trig_learn", say: "Every day at 20:58", since: 1 } });
+    rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 3, lastRunAt: null, cloud: { triggerId: "trig_m", say: "Weekdays at 08:55", since: 1 } });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_l"]')); await tick(60);
+    click(w, d.querySelector('#dvTabs [data-tab="chat"]')); await tick(30);
+    typeIn(w, d.querySelector("#reply"), "which claude sessions are active rn"); submit(w, d.querySelector("#composer")); await tick(500);
+    const r = rt.flags.runs || {}, last = r.lastRuns || [], find = t => last.find(x => x.task === t);
+    ok(rt.flags.chatTools?.includes("claude_runs") && /claude_runs/.test(rt.flags.chatContext || "") && /You can't see sessions the owner opens themselves/.test(rt.flags.chatContext) && /https:\/\/claude\.ai\/code/.test(rt.flags.chatContext), "in chat the super atom can look at Claude's runs, and knows what it can't see");
+    ok(r.runningNow?.length === 1 && r.runningNow[0].task === "Daily agentic AI brief (hub video)" && r.runningNow[0].open === "https://claude.ai/code/session_01BriefRun001xyz" && /^(today|yesterday) \d\d:\d\d$/.test(r.runningNow[0].since), "what's running now, since when, with a link to open it");
+    ok(last[0]?.task === "Friday's main job" && last[0].result === "finished" && last[0].open === "https://claude.ai/code/session_01LeadRun0001xyz" && !!find("Friday's job “Learn from what I do”"), "Atoms' routines go by their atom and job, newest run first");
+    ok(find("Meeting prep's main job")?.result === "failed" && find("Meeting prep's main job").why === "session error" && find("Weekly audit")?.result === "no end recorded" && !find("Daily Slack Insights"), "a failed run says why; a run that never ended isn't counted as running; old runs of tasks that are off are left out");
+    ok(r.next?.[0]?.task === "Friday's main job" && r.next.length === 5 && (r.off || []).join() === "Daily Slack Insights" && r.total === 6, "what runs next, soonest first, and which tasks are off");
+    ok(!/SECRET-PROMPT|Wake atom|Meet Buddy|Atoms ·/.test(JSON.stringify(r)), "names and times only: never a task's instructions or Atoms' internal routine names");
+    ok(/Saw 6 scheduled tasks, 1 running now/.test(text(d, "#msgs")), "its step says what it saw");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+    // not allowed to see scheduled tasks: no tool, and it says where to look instead
+    const rt2 = makeRuntime({ triggers, perms: { "mcp:Claude Code Remote": "denied" } });
+    rt2.db.store.set(`data/users/${UID}/dot_l`, { type: "dot", role: "lead", name: "Friday", responsibility: "Brief me.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 42, createdAt: 1, lastRunAt: null });
+    const v2 = await load(rt2, { wait: 300 });
+    click(v2.w, v2.d.querySelector('#dotList [data-id="dot_l"]')); await tick(60);
+    click(v2.w, v2.d.querySelector('#dvTabs [data-tab="chat"]')); await tick(30);
+    typeIn(v2.w, v2.d.querySelector("#reply"), "anything running?"); submit(v2.w, v2.d.querySelector("#composer")); await tick(400);
+    ok(!(rt2.flags.chatTools || []).includes("claude_runs") && /You can't see the owner's Claude sessions or scheduled tasks from here\. They're listed at https:\/\/claude\.ai\/code/.test(rt2.flags.chatContext || "") && !rt2.flags.runs, "without Claude Code Remote it has no such tool, and says where to look");
   }
   console.log("20. Claude declined for this page");
   {
