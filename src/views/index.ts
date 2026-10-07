@@ -43,6 +43,7 @@ export function buildView() {
             <p class="note" id="replyNote"></p>
           </form>
         </div>
+        <div class="tp scroll" id="tp-know" role="tabpanel" aria-labelledby="tab-know" hidden><div class="tp-in" id="know"></div></div>
         <div class="tp scroll" id="tp-activity" role="tabpanel" aria-labelledby="tab-activity" hidden><div class="tp-in" id="activity"></div></div>
         <div class="tp scroll" id="tp-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden><div class="tp-in"><article class="jobcard main-job" id="mainCard"><div class="part" id="mainJob"></div><section class="card cloud-card" id="cloud"></section><div class="part" id="mainMore"></div></article><div class="jobs-box" id="jobs"></div></div></div>
         <div class="tp scroll" id="tp-settings" role="tabpanel" aria-labelledby="tab-settings" hidden><div class="tp-in" id="settings"></div></div>

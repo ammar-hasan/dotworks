@@ -13,11 +13,32 @@ fs.mkdirSync(dist, { recursive: true });
 
 const entry = `
 import { avatarHtml } from "./src/ui/characters";
-const A = (look, o = {}) => avatarHtml({ id: "sheet-" + JSON.stringify(look) + (o.hue ?? ""), hue: o.hue ?? 214, look }, o);
+const A = (look, o = {}) => avatarHtml({ id: "sheet-" + JSON.stringify(look) + (o.hue ?? ""), hue: o.hue ?? 214, look, ...(o.lead ? { role: "lead" } : {}) }, o);
 const cell = (html, cap) => '<figure class="c">' + html + '<figcaption>' + cap + '</figcaption></figure>';
 const row = (title, cells) => '<section><h2>' + title + '</h2><div class="r">' + cells.join("") + '</div></section>';
 const base = { shape: "orb", eyes: "round", acc: "none" };
+const lead = { shape: "orb", eyes: "wide", acc: "none", orbits: "three" };
 document.querySelector("#sheet").innerHTML = [
+  row("The super atom · pick its orbits", [
+    cell(A(base, { size: 112, hue: 268 }), "an atom, for comparison"),
+    cell(A({ ...lead, orbits: "three" }, { size: 112, hue: 268, lead: true }), "three orbits"),
+    cell(A({ ...lead, orbits: "ring" }, { size: 112, hue: 268, lead: true }), "one ring, three electrons"),
+    cell(A({ ...lead, orbits: "two" }, { size: 112, hue: 268, lead: true }), "two crossed orbits"),
+  ]),
+  row("The super atom · states", [
+    cell(A(lead, { size: 84, hue: 42, lead: true, state: "rest" }), "asleep"),
+    cell(A(lead, { size: 84, hue: 42, lead: true }), "ready"),
+    cell(A(lead, { size: 84, hue: 42, lead: true, state: "live" }), "awake"),
+    cell(A(lead, { size: 84, hue: 42, lead: true, state: "live talk" }), "talking"),
+    cell(A(lead, { size: 84, hue: 42, lead: true, badge: 3 }), "asks waiting"),
+    cell(A(lead, { size: 84, hue: 42, lead: true, state: "cloud" }), "on a schedule"),
+    cell(A(lead, { size: 84, hue: 42, lead: true, state: "cheer" }), "you said yes"),
+  ]),
+  row("The super atom · sizes and looks", [
+    ...[112, 84, 56, 40, 30, 18].map(s => cell(A({ ...lead, shape: "squircle", acc: s >= 40 ? "glasses" : "none" }, { size: s, hue: 196, lead: true }), s + "px")),
+    cell(A({ ...lead, shape: "blob", eyes: "happy", acc: "headphones" }, { size: 84, hue: 330, lead: true }), "blob · headphones"),
+    cell(A({ ...lead, shape: "pebble", eyes: "round", acc: "antenna" }, { size: 84, hue: 152, lead: true }), "pebble · antenna"),
+  ]),
   row("Shapes", ["orb", "squircle", "blob", "pebble"].map((s, i) => cell(A({ ...base, shape: s }, { size: 96, hue: [214, 28, 268, 152][i] }), s))),
   row("Faces", ["round", "wide", "happy", "sleepy"].map((e, i) => cell(A({ ...base, eyes: e }, { size: 96, hue: [196, 340, 48, 120][i] }), e))),
   row("Accessories", ["glasses", "shades", "headphones", "antenna", "beanie"].map((a, i) => cell(A({ ...base, shape: ["squircle", "orb", "orb", "pebble", "blob"][i], acc: a }, { size: 84, hue: [214, 268, 28, 152, 330][i] }), a))),
@@ -53,7 +74,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:400 14px var(--f-ui)}
 .r{display:flex;flex-wrap:wrap;gap:30px 40px;align-items:flex-end}
 .c{margin:0;display:flex;flex-direction:column;align-items:center;gap:16px;min-width:80px}
 figcaption{font:400 12px var(--f-mono);color:var(--muted)}
-</style></head><body><main class="cs"><h1>Atoms</h1><p class="lede">Every shape, face, accessory and state, drawn by the app itself. The electron's speed is an atom's energy: lazy asleep, quick awake, blue on a schedule.</p><div id="sheet"></div></main>
+</style></head><body><main class="cs"><h1>Atoms</h1><p class="lede">Every shape, face, accessory and state, drawn by the app itself. The electron's speed is an atom's energy: lazy asleep, quick awake, blue on a schedule. Your super atom carries more electrons than the rest.</p><div id="sheet"></div></main>
 <script>${js.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 fs.writeFileSync(path.join(dist, "spritesheet.html"), html);
 console.log("wrote dist/spritesheet.html");

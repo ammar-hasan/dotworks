@@ -45,10 +45,10 @@
 .av .orbit{position:absolute;inset:-17%;pointer-events:none;transform:rotate(var(--tilt,-24deg))}
 .av .orbit::before{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid hsl(var(--h) 70% calc(var(--el-l) - 6%) / var(--orbit-a));transform:scaleY(.42)}
 .av .orbit.front::before{border-color:transparent transparent hsl(var(--h) 70% calc(var(--el-l) - 4%) / calc(var(--orbit-a) * 1.3)) transparent}
-.av .orbit i{position:absolute;left:50%;top:50%;width:0;height:0;animation:ox calc(var(--orb,7s) / 2) cubic-bezier(.37,0,.63,1) infinite alternate;animation-delay:calc(var(--bd,0s) - var(--orb,7s) / 4)}
+.av .orbit i{position:absolute;left:50%;top:50%;width:0;height:0;animation:ox calc(var(--orb,7s) / 2) cubic-bezier(.37,0,.63,1) infinite alternate;animation-delay:calc(var(--bd,0s) + var(--ph,0s) - var(--orb,7s) / 4)}
 .av .orbit b{position:absolute;left:calc(var(--e) / -2);top:calc(var(--e) / -2);width:var(--e);height:var(--e);border-radius:50%;
   background:hsl(var(--h) 100% var(--el-l));box-shadow:0 0 calc(var(--s) * .09) hsl(var(--h) 95% 64% / .9);
-  animation:oy calc(var(--orb,7s) / 2) cubic-bezier(.37,0,.63,1) infinite alternate,e-back var(--orb,7s) linear infinite;animation-delay:var(--bd,0s),var(--bd,0s)}
+  animation:oy calc(var(--orb,7s) / 2) cubic-bezier(.37,0,.63,1) infinite alternate,e-back var(--orb,7s) linear infinite;animation-delay:calc(var(--bd,0s) + var(--ph,0s)),calc(var(--bd,0s) + var(--ph,0s))}
 .av .orbit.front b{animation-name:oy,e-front}
 @keyframes ox{from{transform:translateX(calc(var(--s) * -.67))}to{transform:translateX(calc(var(--s) * .67))}}
 @keyframes oy{from{transform:translateY(calc(var(--s) * -.28))}to{transform:translateY(calc(var(--s) * .28))}}
@@ -56,6 +56,21 @@
 /* top of the orbit is the far side: behind the body; bottom is the near side: in front */
 @keyframes e-back{0%,22%{opacity:1}28%,72%{opacity:0}78%,100%{opacity:1}}
 @keyframes e-front{0%,22%{opacity:0}28%,72%{opacity:1}78%,100%{opacity:0}}
+/* the super atom: more electrons, a third of a lap apart. "three": three orbits a third of a turn apart (the atom
+   you know from the symbol); "ring": three electrons chasing round one ring; "two": two crossed orbits. Its lines
+   are a touch stronger and its glow a touch wider, so it reads as the one the others orbit. */
+.av.lead .orbit.o1{--ph:calc(var(--orb,7s) / -3)}
+.av.lead .orbit.o2{--ph:calc(var(--orb,7s) / -1.5)}
+.av.lead[data-orbits="three"] .orbit.o1{transform:rotate(calc(var(--tilt,-24deg) + 60deg))}
+.av.lead[data-orbits="three"] .orbit.o2{transform:rotate(calc(var(--tilt,-24deg) + 120deg))}
+.av.lead[data-orbits="two"] .orbit.o1{transform:rotate(calc(var(--tilt,-24deg) + 90deg));--ph:calc(var(--orb,7s) / -2)}
+.av.lead[data-orbits="ring"] .orbit.o1::before,.av.lead[data-orbits="ring"] .orbit.o2::before{display:none}
+.av.lead .orbit::before{border-color:hsl(var(--h) 72% calc(var(--el-l) - 6%) / calc(var(--orbit-a) * 1.8))}
+.av.lead .orbit.front::before{border-color:transparent transparent hsl(var(--h) 72% calc(var(--el-l) - 4%) / calc(var(--orbit-a) * 2.3)) transparent}
+.av.lead .body{box-shadow:0 0 calc(var(--s) * .75) hsl(var(--h) 90% 60% / var(--glow)),inset 0 calc(var(--s) * -.07) calc(var(--s) * .2) hsl(var(--h) 80% 12% / .35)}
+/* tiny: no orbits fit, so a thin halo says which one it is */
+.av.lead.tiny .ring{inset:-2px;border:1px solid hsl(var(--h) 85% calc(var(--el-l) - 4%) / .85)}
+
 .av.live{--orb:1.7s}
 .av.rest{--orb:16s}
 .av.rest .orbit{opacity:.55}
@@ -84,6 +99,8 @@
 .av.seed .body{background:radial-gradient(circle,hsl(var(--h) 85% 70% / .22),transparent 66%);box-shadow:0 0 30px hsl(var(--h) 90% 60% / calc(var(--glow) * .45)),inset 0 0 0 1.5px hsl(var(--h) 75% 70% / .6);animation:none}
 .av.seed .eye,.av.seed .acc,.av.seed .mouth{opacity:.55}
 .av.seed .orbit,.av.seed .cheeks{display:none}
+/* the super atom you haven't added yet keeps its orbits, so you can tell what it is */
+.av.lead.seed .orbit{display:block;opacity:.8}
 
 /* small avatars keep just the face */
 .av.tiny .orbit,.av.tiny .cheeks,.av.tiny .zz,.av.tiny .mouth,.av.tiny .eye::before{display:none}

@@ -4,7 +4,8 @@ import { NS, S, awake, dueDots, pending } from "../core/state";
 import { askItems } from "../features/asks";
 import { recheckApps } from "../features/cloud";
 import { paintTell } from "../features/tell";
-import { avatarHtml, stateOf } from "../ui/characters";
+import { avatarHtml, isLead, stateOf } from "../ui/characters";
+import { heldAsks, pingHold } from "../features/attention";
 import { dotStatus } from "../ui/shell";
 import { nextEvent, renderHorizon } from "./horizon";
 
@@ -15,6 +16,7 @@ export function summaryLine() {
   let s = `${plural(S.dots.length, "atom")}`;
   if (up) s += ` · ${up} awake in the cloud`;
   s += due ? ` · ${due} ready to wake` : " · none due yet";
+  const held = heldAsks().length; if (held) s += ` · ${held} held back`;
   const nx = nextEvent();
   if (nx) s += nx.now ? ` · you're in “${nx.ev.title}” until ${fmtTime(nx.ev.end)}` : ` · next meeting in ${span(nx.ev.start - Date.now())}`;
   return s + ".";
@@ -58,8 +60,11 @@ export function paintPeek() {
 export let fieldPts = [];
 export function fieldItems() {
   if (!S.uid || !S.dotsLoaded) return [];
-  if (!S.dots.length) return S.seeds.filter(s => s.starter).slice(0, 4).map(s => ({ kind: "seed", key: "seed:" + s.key, seed: s }));
-  return [...S.dots.map(d => ({ kind: "dot", key: d.id, dot: d })), { kind: "ghost", key: "ghost" }];
+  // the super atom comes first; without one, a place to add it sits beside the starters or your atoms
+  const lead = S.dots.find(isLead), leadGhost = lead || !NS.db ? [] : [{ kind: "lead", key: "lead-ghost" }];
+  if (!S.dots.length) return [...leadGhost, ...S.seeds.filter(s => s.starter).slice(0, 4).map(s => ({ kind: "seed", key: "seed:" + s.key, seed: s }))];
+  const dots = [...(lead ? [lead] : []), ...S.dots.filter(d => d !== lead)];
+  return [...leadGhost, ...dots.map(d => ({ kind: "dot", key: d.id, dot: d })), { kind: "ghost", key: "ghost" }];
 }
 export function renderField() {
   const field = $("#field"); if (!field) return;
@@ -82,23 +87,27 @@ export function renderField() {
     keep.add(it.key);
     let el = field.querySelector(`[data-key="${cssKey(it.key)}"]`);
     if (!el) {
-      el = document.createElement("button"); el.type = "button"; el.className = "orb-btn" + (it.kind === "ghost" ? " ghost" : ""); el.dataset.key = it.key;
+      el = document.createElement("button"); el.type = "button"; el.className = "orb-btn" + (it.kind === "ghost" || it.kind === "lead" ? " ghost" : ""); el.dataset.key = it.key;
       const dly = (-(i * 1.7) % 9).toFixed(2) + "s"; el.style.setProperty("--i", i);
       el.innerHTML = it.kind === "ghost" ? `<span class="float" style="--d:${dly}"><span class="ghost-c">${ICON.plus}</span><span class="orb-name">New atom</span><span class="orb-meta">make your own</span></span>`
+        : it.kind === "lead" ? `<span class="float" style="--d:${dly}"><span class="avw">${avatarHtml({ id: "lead-ghost", role: "lead", hue: 42, look: { shape: "orb", eyes: "wide", acc: "none", orbits: "three" } }, { size: av, state: "seed" })}</span><span class="orb-name">Your super atom</span><span class="orb-meta">learns how you work</span></span>`
         : `<span class="float" style="--d:${dly};--dur:${10 + (i % 3) * 1.5}s"><span class="avw"></span><span class="orb-name"></span><span class="orb-meta"></span></span>`;
       field.append(el);
     }
     el.style.left = fieldPts[i].x + "%"; el.style.top = fieldPts[i].y + "%";
     if (it.kind === "ghost") { el.dataset.act = "new"; el.setAttribute("aria-label", "Make a new atom"); return; }
+    if (it.kind === "lead") { el.dataset.act = "lead-new"; el.setAttribute("aria-label", "Add your super atom: it learns how you work and guards your attention"); return; }
     const avw = el.querySelector(".avw"), nm = el.querySelector(".orb-name"), mt = el.querySelector(".orb-meta");
     let avh, name, meta, mcl = "", label;
     if (it.kind === "seed") {
-      const s = it.seed; el.dataset.act = "plant-open"; el.dataset.id = s.key;
+      const s = (it as any).seed; el.dataset.act = "plant-open"; el.dataset.id = s.key;
       avh = avatarHtml({ ...s, id: s.key }, { size: av, state: "seed" }); name = s.name; meta = "tap to add"; label = `${s.name}: open to add it.`;
     } else {
-      const d = (it as any).dot, asks = pending().filter(a => a.dotId === d.id).length, [st, cl] = dotStatus(d);
-      el.dataset.act = "open-dot"; el.dataset.id = d.id;
-      avh = avatarHtml(d, { size: av, state: stateOf(d), badge: asks || "" }); name = d.name; meta = st; mcl = cl;
+      const d = (it as any).dot, asks = pending().filter(a => a.dotId === d.id).length, [st, cl] = dotStatus(d), lead = isLead(d);
+      el.dataset.act = "open-dot"; el.dataset.id = d.id; el.classList.toggle("lead", lead);
+      // the super atom is a little bigger, and says when its pings are waiting
+      const hold = lead ? pingHold() : null;
+      avh = avatarHtml(d, { size: lead ? Math.round(av * 1.22) : av, state: stateOf(d), badge: asks || "" }); name = d.name; meta = lead && hold && (hold.kind === "waiting" || hold.kind === "unread") && !S.running && !cl ? `holding pings: ${hold.text}` : st; mcl = cl;
       label = `${d.name}, ${st}`; el.title = S.latest[d.id]?.headline ? `Latest: ${S.latest[d.id].headline}` : "";
     }
     if (avw.dataset.sig !== avh) { avw.innerHTML = avh; avw.dataset.sig = avh; }

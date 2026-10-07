@@ -75,6 +75,20 @@ const shots = [
   { name: "m-seeds-light", scene: "full", ...M, scheme: "light", steps: [navM("seeds")] },
   { name: "m-sheet-dark", scene: "full", ...M, scheme: "dark", steps: [async p => { await p.click('#homeActions [data-act="new"]'); await p.waitForTimeout(500); }] },
   { name: "m-acct-dark", scene: "full", ...M, scheme: "dark", steps: [async p => { await p.click('#tabbar [data-act="acct"]'); await p.waitForTimeout(400); }] },
+  // the super atom
+  { name: "lead-home-dark", scene: "lead", ...D, scheme: "dark" },
+  { name: "lead-home-light", scene: "lead", ...D, scheme: "light" },
+  { name: "lead-know-light", scene: "lead", ...D, scheme: "light", steps: [openDot("Friday"), tab("know")] },
+  { name: "lead-know-dark", scene: "lead", ...D, scheme: "dark", steps: [openDot("Friday"), tab("know")] },
+  { name: "lead-know-attention-dark", scene: "lead", ...D, scheme: "dark", steps: [openDot("Friday"), tab("know"), async p => { await p.evaluate(() => document.querySelector(".attn")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(200); }] },
+  { name: "lead-know-edit-light", scene: "lead", ...D, scheme: "light", steps: [openDot("Friday"), tab("know"), click('#know [data-act="mem-edit"][data-id="mem_2"]'), click('#know [data-act="mem-forget"][data-id="mem_3"]')] },
+  { name: "m-lead-know-dark", scene: "lead", ...M, scheme: "dark", steps: [openDotM("Friday"), tab("know")] },
+  { name: "m-lead-home-light", scene: "lead", ...M, scheme: "light" },
+  { name: "lead-chat-dark", scene: "lead", ...D, scheme: "dark", steps: [openDot("Friday")] },
+  { name: "lead-jobs-light", scene: "lead", ...D, scheme: "light", steps: [openDot("Friday"), tab("schedule")] },
+  { name: "lead-asks-held-light", scene: "lead", ...D, scheme: "light", steps: [nav("asks"), click('[data-act="held-toggle"]')] },
+  { name: "lead-sheet-dark", scene: "full", ...D, scheme: "dark", steps: [async p => { await p.click('.field .orb-btn[data-act="lead-new"]'); await p.waitForTimeout(500); }] },
+  { name: "m-lead-sheet-light", scene: "full", ...M, scheme: "light", steps: [async p => { await p.click('.field .orb-btn[data-act="lead-new"]'); await p.waitForTimeout(500); }] },
 ];
 const filter = process.argv[2] ? new RegExp(process.argv[2]) : null;
 // the page's Google Fonts, served locally so screenshots match the artifact. Without them the browser falls back to

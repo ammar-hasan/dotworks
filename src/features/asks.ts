@@ -3,6 +3,8 @@ import { carryOn, emailsOf } from "../ai/flow";
 import { answerText, questionOf, questionPlan } from "./questions";
 import { afterJobAnswer, decisionsHtml, decisionsSig, groupKey, groupOf, isCommandJob, isDecision, isJobQuestion } from "./jobs";
 import { canUndo, inverseOf, receiptHtml, receiptOf, snapshotForUndo, undoAction } from "./receipts";
+import { heldAsks, heldLine } from "./attention";
+import { applyMemoryAnswer } from "./memory";
 import { loadSchema, schemaOf } from "../ai/schemas";
 import { FIX, ICON, KINDS, RSVP, SRV, TZ } from "../core/constants";
 import { diag } from "../core/diag";
@@ -56,6 +58,11 @@ export function canExecute(a) {
   if (a.kind === "tool") return appUsable(a.payload?.server) && (!S.connLoaded || toolsOf(a.payload.server).includes(a.payload.tool));
   return true;
 }
+// an ask that follows something you told your atoms says so
+export function usedHtml(a) {
+  const u = Array.isArray(a.memoryUsed) ? a.memoryUsed.filter(x => x && x.text) : [];
+  return u.length ? `<p class="used">Because you told me: “${esc(clean(u[0].text).slice(0, 160))}”${u.length > 1 ? ` and ${u.length - 1} more` : ""}</p>` : "";
+}
 export function askHtml(a, o = {}) {
   if ((a.kind === "agenda" || a.kind === "tool" || a.kind === "question") && !S.edits[a.id]) S.edits[a.id] = {};
   const d = S.dots.find(x => x.id === a.dotId), busy = !!S.busy[a.id], err = S.errs[a.id], k = KINDS[a.kind] || KINDS.note, id = esc(a.id);
@@ -81,8 +88,8 @@ export function askHtml(a, o = {}) {
   ].join("");
   const who = (o as any).inChat ? "" : `${d ? avatarHtml(d, { size: 18 }) : ""}<span>${esc(d?.name || "An atom")}</span><span>·</span>`;
   return `<article class="ask" data-key="${id}" style="--h:${hueOf(d)}" data-comment-target>
-    <div class="from">${who}<span class="kind">${esc(a.kind === "tool" ? shortOf(a.payload?.server) : k.label)}</span><span>· ${ago(a.createdAt)}</span>${a.source === "cloud" ? `<span class="cloud-tag">· from the cloud</span>` : ""}<button type="button" class="x" data-act="dismiss" data-id="${id}" aria-label="Not now" title="Not now">×</button></div>
-    <h4>${esc(a.title)}</h4>${a.why ? `<p>${esc(a.why)}</p>` : ""}${actionPlan(a)}
+    <div class="from">${who}<span class="kind">${esc(a.kind === "tool" ? shortOf(a.payload?.server) : k.label)}</span><span>· ${ago(a.createdAt)}</span>${a.source === "cloud" ? `<span class="cloud-tag">· from the cloud</span>` : ""}${a.urgent ? `<span class="urgent-tag">· today</span>` : ""}${a.state === "held" ? `<span class="held-tag">· held back</span>` : ""}<button type="button" class="x" data-act="dismiss" data-id="${id}" aria-label="Not now" title="Not now">×</button></div>
+    <h4>${esc(a.title)}</h4>${a.why ? `<p>${esc(a.why)}</p>` : ""}${usedHtml(a)}${actionPlan(a)}
     ${primary || secondary ? `<div class="row">${primary}${secondary}</div>` : ""}${err ? `<p class="err">${esc(err.msg)}</p>` : ""}</article>`;
 }
 // asks as list items: a job's decisions from one run read as one short list
@@ -107,9 +114,12 @@ export function paintAsks() {
   const fh = f.map(([k, l]) => `<button type="button" class="chip" data-act="ask-filter" data-id="${k}" aria-pressed="${S.askFilter === k}">${l}${counts[k] ? ` · ${counts[k]}` : ""}</button>`).join("");
   if ($("#asksFilter").innerHTML !== fh) $("#asksFilter").innerHTML = fh;
   const shown = p.filter(a => S.askFilter === "all" || bucketOf(a) === S.askFilter);
-  if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When an atom wants to change something, or needs your say, it asks here first.") : "Sign in to see what your atoms ask you."}</p>`; if (list.innerHTML !== msg) list.innerHTML = msg; }
-  else reconcile(list, askItems(shown));
-  const handled = S.actions.filter(a => a.state !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)), hb = $("#handled");
+  // with a super atom, what can wait is held back while too much waits: say how much, and show it on request
+  const hl = heldLine(), heldItems = S.showHeld ? askItems(heldAsks().filter(a => S.askFilter === "all" || bucketOf(a) === S.askFilter)) : [];
+  const extra = [...(hl ? [{ key: "held", html: hl, sig: hl }] : []), ...heldItems];
+  if (!shown.length) { const msg = `<p class="calm" data-key="calm">${!S.booted ? "…" : S.uid ? (p.length ? "Nothing of this kind." : "Nothing waiting. When an atom wants to change something, or needs your say, it asks here first.") : "Sign in to see what your atoms ask you."}</p>`; if (extra.length) reconcile(list, [{ key: "calm", html: msg, sig: msg }, ...extra]); else if (list.innerHTML !== msg) list.innerHTML = msg; }
+  else reconcile(list, [...askItems(shown), ...extra]);
+  const handled = S.actions.filter(a => a.state !== "pending" && a.state !== "held").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)), hb = $("#handled");
   if (!handled.length) { hb.innerHTML = ""; return; }
   const wasOpen = !!hb.querySelector("details[open]");
   hb.innerHTML = `<details class="handled" ${wasOpen ? "open" : ""}><summary>Handled lately · ${handled.length}</summary><div style="margin-top:8px;max-width:680px">${handled.slice(0, 10).map(a => {
@@ -137,7 +147,7 @@ export async function execute(id) {
       if (!p.to.length || !p.body) throw { code: "local", message: "Add a recipient and a message first." };
       const args = { to: p.to, subject: p.subject || "", body: p.body }; if ((p.cc || []).length) (args as any).cc = p.cc; if (p.replyToMessageId) (args as any).replyToMessageId = p.replyToMessageId;
       const r = await NS.mcp.callTool(SRV.mail, "create_draft", args);
-      result = { label: "Draft saved in Gmail", url: (r?.payload as any)?.viewUrl || null, receipt: receiptOf(a, args), undo: inverseOf(SRV.mail, "create_draft", args, r?.payload) }; if (ed) payloadUpdate = p;
+      result = { label: "Draft saved in Gmail", url: (r?.payload as any)?.viewUrl || null, receipt: receiptOf(a, args), undo: inverseOf(SRV.mail, "create_draft", args, r?.payload), edits: editsOf(base, p, ["to", "subject", "body"]) }; if (ed) payloadUpdate = p;
     } else if (a.kind === "rsvp") {
       const args = { eventId: a.payload.eventId, responseStatus: a.payload.response }; if (a.payload.comment) (args as any).responseComment = a.payload.comment;
       await NS.mcp.callTool(SRV.cal, "respond_to_event", args);
@@ -162,7 +172,7 @@ export async function execute(id) {
       const before = await snapshotForUndo(p.server, p.tool, input);
       const r = await NS.mcp.callTool(p.server, p.tool, input), pl = r?.payload && typeof r.payload === "object" ? r.payload : {};
       const url = [(pl as any).htmlLink, (pl as any).viewUrl, (pl as any).webViewLink, (pl as any).url, (pl as any).permalink, (pl as any).link].find(u => typeof u === "string" && /^https:\/\//.test(u)) || a.link || null;
-      result = { label: `${a.verb || humanTool(p.tool)} · done`, url, receipt: receiptOf(a, input), undo: before || inverseOf(p.server, p.tool, input, pl) }; payloadUpdate = { ...p, input };
+      result = { label: `${a.verb || humanTool(p.tool)} · done`, url, receipt: receiptOf(a, input), undo: before || inverseOf(p.server, p.tool, input, pl), edits: editsOf(p.input || {}, input, Object.keys(input).filter(k => !isIdKey(k))) }; payloadUpdate = { ...p, input };
       delete S.armed[id]; NS.mcp.invalidate(p.server).catch(() => {});
     } else if (a.kind === "agenda") {
       const agenda = clean(ed?.agenda ?? a.payload.agenda ?? a.draft).trim().slice(0, 4000);
@@ -182,9 +192,9 @@ export async function execute(id) {
         const undo = cur.trim() && toolsOf(SRV.cal).includes("update_event") ? { server: SRV.cal, tool: "update_event", input: { eventId: a.payload.eventId, description: cur, notificationLevel: "NONE" }, label: "Take the agenda out" } : null;
         result = { label: ed?.notify ? "Agenda added; guests emailed" : "Agenda added to the invite", url: (ev as any).htmlLink || a.link || null, receipt: receiptOf(a, {}), undo };
       }
-      payloadUpdate = { ...a.payload, agenda }; NS.mcp.invalidate(SRV.cal).catch(() => {});
+      payloadUpdate = { ...a.payload, agenda }; if (result && !result.edits) result.edits = editsOf(a.payload, { agenda }, ["agenda"]); NS.mcp.invalidate(SRV.cal).catch(() => {});
     } else result = { label: "Marked handled" };
-    result = { ...result, at: Date.now(), undo: result.undo || null };
+    result = { ...result, at: Date.now(), undo: result.undo || null }; if (!result.edits?.length) delete result.edits;
     await setActionState(id, "done", { result, ...(payloadUpdate ? { payload: payloadUpdate } : {}) });
     delete S.edits[id]; cheer(a.dotId); toast(result.label, result.undo ? { label: "Undo", fn: () => undoAction(id) } : undefined);
   } catch (e) {
@@ -195,12 +205,17 @@ export async function execute(id) {
   delete S.busy[id]; renderAll();
 }
 
+/* what you changed before approving (field, before, after), so your super atom can learn from it; a few short lines */
+export function editsOf(before, after, keys: string[]) {
+  const show = v => clean(Array.isArray(v) ? v.join(", ") : typeof v === "object" && v ? JSON.stringify(v) : String(v ?? "")).replace(/\s+/g, " ").trim();
+  return keys.filter(k => show(before?.[k]) !== show(after?.[k])).slice(0, 3).map(k => ({ field: k, from: show(before?.[k]).slice(0, 200), to: show(after?.[k]).slice(0, 200) }));
+}
 // the atom that asked does a little hop when you say yes or answer it
 export function cheer(dotId) { if (!dotId) return; S.cheer[dotId] = Date.now(); setTimeout(() => renderAll(), 1600); }
 
 // you answered a dot's question: save it, then let the dot carry on with it
 export async function answerQuestion(id: string, choiceId: string) {
-  const a = S.actions.find(x => x.id === id); if (!a || a.kind !== "question" || a.state !== "pending" || S.busy[id]) return;
+  const a = S.actions.find(x => x.id === id); if (!a || a.kind !== "question" || (a.state !== "pending" && a.state !== "held") || S.busy[id]) return;
   const text = answerText(a, choiceId); if (!text) return;
   S.busy[id] = true; renderAll();
   const answer = { choice: choiceId === "own" ? null : choiceId, text, at: Date.now() };
@@ -208,6 +223,8 @@ export async function answerQuestion(id: string, choiceId: string) {
   delete S.busy[id];
   if (!ok) { renderAll(); return; }
   delete S.edits[id]; cheer(a.dotId); renderAll();
+  // "Is this right?" from the super atom: your answer keeps or drops what it learned, and that's all
+  if (a.memoryId) { applyMemoryAnswer({ ...a, answer }, choiceId); return; }
   // a job's question carries on here like the main job's; a job that runs a command in a repo carries on in the
   // cloud instead, once all of that run's questions are answered
   if (isJobQuestion(a)) { const j = S.jobs.find(x => x.id === a.jobId); if (!j || isCommandJob(j)) { afterJobAnswer({ ...a, answer, state: "done" }); return; } }

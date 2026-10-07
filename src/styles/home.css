@@ -59,3 +59,5 @@
 .tell-note:empty{display:none}
 .tell-note .fine{margin-right:4px}
 .tell-note .chip .av{flex:none}
+/* your super atom: first in the field, a little larger, its name a little bolder */
+.orb-btn.lead .orb-name{font-weight:650}

@@ -5,6 +5,8 @@ import { $, ago, clamp, clean, cssKey, esc, fmtWhen, hueOf, pad, toast, upsertLo
 import { NS, S, artifactUrl, canRunHere, cloudOn, connPerm, curDot, jobDriven, jobsOf, userDoc } from "../core/state";
 import { renderAll } from "../ui/shell";
 import { isCommandJob, jobTitle, paintJobs } from "./jobs";
+import { leadOf } from "./attention";
+import { isLead } from "../ui/characters";
 
 /* ─── cloud: an atom (or one of its jobs) that wakes on its own, through a routine (Claude's scheduled tasks) ───
    Each atom, and each of an atom's jobs, gets its own routine, made from this page. Two platform rules shape this file:
@@ -30,9 +32,12 @@ export function firingFor(s: Sub) {
 export const cloudFiringFor = d => firingFor(subOf(d)) || jobsOf(d).some(j => firingFor(subOf(d, j)));
 export function cloudPlan(s: Sub) {
   const dr = S.cloudDraft[s.id] || {}, d = s.d, j = s.j;
-  const def = j ? (j.run ? "daily" : "weekdays") : d.cadence === "weekly" ? "weekly" : d.cadence === "hourly" ? "every3" : "weekdays";
+  // the super atom pings every 3 hours by default and learns once a day, in the evening
+  const lead = isLead(d), def = j ? (j.run || j.learn ? "daily" : "weekdays") : lead || d.cadence === "hourly" ? "every3" : d.cadence === "weekly" ? "weekly" : "weekdays";
   const when = ["weekdays", "daily", "weekly", "every3"].includes(dr.when) ? dr.when : def;
-  const hour = clamp(Number(dr.hour ?? 9) || 9, 5, 22), push = dr.push !== false;
+  const hour = clamp(Number(dr.hour ?? (j?.learn ? 21 : 9)) || 9, 5, 22);
+  // with a super atom, it is the one that pings your phone (within your budget); other schedules stay quiet by default
+  const push = typeof dr.push === "boolean" ? dr.push : j ? !j.learn && !leadOf() : lead || !leadOf();
   const taskName = j ? `Atoms · ${d.name} · ${jobTitle(j)} · ${j.id.slice(-4)}` : `Atoms · ${d.name} · ${d.id.slice(-4)}`;
   // land a few minutes before the hour, as the scheduler asks, so runs aren't delayed by the top-of-hour rush
   const early = ((taskName.match(/[A-Za-z]/g) || []).length % 15) + 1, m = 60 - early, h = hour - 1;
@@ -54,7 +59,8 @@ export const routineUrl = id => /^trig_[A-Za-z0-9]{1,40}$/.test(String(id || "")
 export const appKey = n => String(n || "").toLowerCase().replace(/[^a-z]/g, "");
 export const wantApps = d => normSources(d.sources);
 export const missingApps = (d, t) => (t && Array.isArray(t.apps) ? wantApps(d).filter(n => !t.apps.includes(appKey(n))) : []);
-const lacks = (d, rec) => { const t = rec?.cloud ? S.triggers?.get(rec.cloud.triggerId) : null; return !!(t && missingApps(d, t).length); };
+// the super atom's learning job reads only what you do in Atoms: it needs none of your apps
+const lacks = (d, rec) => { const t = rec?.cloud && !rec.learn ? S.triggers?.get(rec.cloud.triggerId) : null; return !!(t && missingApps(d, t).length); };
 export const appsMissingFor = d => lacks(d, d) || jobsOf(d).some(j => lacks(d, j));
 
 export async function loadTriggers(refresh?) {
@@ -124,7 +130,7 @@ export function paintCloudBox(s: Sub, box) {
     else if (!t) html = shell("off", "Its schedule is gone", `<p class="note">The scheduled task for ${esc(nm)} no longer exists. It may have been deleted from Claude's scheduled tasks.</p><div class="row"><button class="btn sm" data-act="cloud-forget"${ja}>Forget it</button><button class="btn ghost sm" data-act="cloud-check">Check again</button></div>`);
     else {
       const last = t.last ? `<span>last run <b class="${t.last.status === "succeeded" ? "ok" : t.last.status === "failed" ? "bad" : ""}">${esc(t.last.status || "—")}</b>${t.last.at ? " " + ago(t.last.at) : ""}</span>` : `<span>no runs yet</span>`;
-      const firing = firingFor(s), miss = missingApps(d, t);
+      const firing = firingFor(s), miss = j?.learn ? [] : missingApps(d, t);
       const appsStep = miss.length ? `<div class="banner apps-step" style="margin:0"><span class="grow"><b>One step left: give it your ${esc(miss.join(" and "))}.</b> For your safety, only you can let a scheduled task open your apps; the app can't do it for you. Open its routine (<b>“${esc(t.name || cloudPlan(s).taskName)}”</b>), choose <b>Edit</b>, tick ${esc(miss.join(" and "))} under <b>Connectors</b>, and save. This page notices by itself when you come back.</span><span class="row"><a class="btn pri sm" href="${esc(routineUrl(rec.cloud.triggerId))}" target="_blank" rel="noopener" data-act="apps-open">Open its routine</a><button class="btn ghost sm" data-act="cloud-check" ${S.trigLoading ? "disabled" : ""}>${S.trigLoading ? "Checking…" : "Check again"}</button></span></div>` : "";
       const idle = j ? "It runs on its own, even with this page closed. Its note and anything it needs your say on land here and in Asks." : "It wakes on its own, even with this page closed. Notes and asks land here.";
       html = shell(t.enabled ? "on" : "off", t.enabled ? awakeTitle : j ? "Paused" : `${esc(d.name)} is paused`, `
@@ -140,15 +146,15 @@ export function paintCloudBox(s: Sub, box) {
       <div class="row"><button class="btn sm" data-act="cloud-find"${ja} ${S.trigLoading ? "disabled" : ""}>Find it</button><button class="btn ghost sm" data-act="cloud-cancel"${ja}>Cancel</button></div>${errLine}`);
   } else if (!S.cloudOpen[s.id]) {
     html = j ? shell("off", "Not scheduled yet", `<p class="note">Give it a schedule and it runs in the cloud on its own, even when this page is closed. Its note and asks will be waiting here.</p><div class="row"><button class="btn pri sm" data-act="cloud-open"${ja}>Schedule it…</button></div>`)
-      : shell("off", `Keep ${esc(d.name)} awake`, `<p class="note">Let it wake on its own in the cloud, on a schedule, even when this page is closed. Its notes and asks will be waiting in Chat.</p><div class="row"><button class="btn pri sm" data-act="cloud-open">Keep awake…</button></div>`);
+      : shell("off", `Keep ${esc(d.name)} awake`, `<p class="note">${isLead(d) ? `Let it check in on its own every few hours, even when this page is closed. It pings your phone only when something is worth it, and never past the budget on its You tab.` : `Let it wake on its own in the cloud, on a schedule, even when this page is closed. Its notes and asks will be waiting in Chat.`}</p><div class="row"><button class="btn pri sm" data-act="cloud-open">Keep awake…</button></div>`);
   } else {
     const plan = cloudPlan(s), step = S.cloudStep[s.id], ready = !!artifactUrl();
     html = shell("on", j ? "Schedule it" : `Keep ${esc(d.name)} awake`, `
       <div class="pickers"><label class="sr" for="cl-when-${k}">When</label><select id="cl-when-${k}" data-cloud="when"${ja}>${[["weekdays", "Every weekday"], ["daily", "Every day"], ["weekly", "Every Monday"], ["every3", "Every 3 hours"]].map(([v, l]) => `<option value="${v}" ${plan.when === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       ${plan.when !== "every3" ? `<span class="note">around</span><label class="sr" for="cl-hour-${k}">Hour</label><select id="cl-hour-${k}" data-cloud="hour"${ja}>${Array.from({ length: 18 }, (_, i) => i + 5).map(hh => `<option value="${hh}" ${plan.hour === hh ? "selected" : ""}>${pad(hh)}:00</option>`).join("")}</select>` : ""}</div>
-      <label class="check"><input type="checkbox" id="cl-push-${k}" data-cloud="push"${ja} ${plan.push ? "checked" : ""}> Ping my phone when it finds something</label>
+      <label class="check"><input type="checkbox" id="cl-push-${k}" data-cloud="push"${ja} ${plan.push ? "checked" : ""}> ${isLead(d) && !j ? "Ping my phone, within my budget" : "Ping my phone when it finds something"}</label>${leadOf() && !(isLead(d) && !j) ? `<p class="fine">${esc(leadOf().name)} tells you when this matters, so this can stay off.</p>` : ""}
       <p class="fine mono">${esc(plan.say)} · ${esc(TZ)}</p>
-      <p class="note">${j ? `This creates a scheduled task for this job in your Claude account. Each time, it runs in its own cloud session, does the job, and leaves its note and asks here.` : `This creates ${esc(d.name)}'s own scheduled task in your Claude account. Each time, it wakes in its own cloud session, does its job, and leaves its note and asks in Chat. It never sends anything on its own.`}${wantApps(d).length ? ` Then you give that task your ${esc(wantApps(d).join(" and "))} once, in Claude's Routines; the app shows you how.` : ""}</p>
+      <p class="note">${j ? `This creates a scheduled task for this job in your Claude account. Each time, it runs in its own cloud session, does the job, and leaves its note and asks here.` : `This creates ${esc(d.name)}'s own scheduled task in your Claude account. Each time, it wakes in its own cloud session, does its job, and leaves its note and asks in Chat. It never sends anything on its own.`}${j?.learn ? " It reads only what you do in Atoms, so it needs none of your apps." : wantApps(d).length ? ` Then you give that task your ${esc(wantApps(d).join(" and "))} once, in Claude's Routines; the app shows you how.` : ""}</p>
       ${ready ? "" : `<p class="err">Atoms doesn't know its own address yet, so a cloud wake couldn't find its way back. In Claude Code, open the dotworks repo and say “finish Atoms setup”.</p>`}
       <div class="row"><button class="btn pri sm" data-act="cloud-create"${ja} ${busy || !ready ? "disabled" : ""}>${busy ? esc(step || "Working…") : j ? "Schedule it" : "Keep it awake"}</button><button class="btn ghost sm" data-act="cloud-close"${ja} ${busy ? "disabled" : ""}>Not now</button></div>${errLine}`);
   }

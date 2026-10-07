@@ -1,0 +1,26 @@
+/* the super atom's You tab: what it knows about you, and your attention budget */
+.know{display:flex;flex-direction:column;gap:18px;max-width:760px}
+.know-h h3{font:700 19px/1.25 var(--f-ui);letter-spacing:-.015em;margin-bottom:4px}
+.know-h .note{max-width:62ch}
+.know-sug{gap:10px;border-color:hsl(var(--h,42) 70% 60% / .45)}
+.mem-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.mem:first-child{border-top:0}
+.mem-t{min-width:0;display:flex;flex-direction:column;gap:3px}
+.mem-t > span,.mem-t > b{font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+.mem-t > b{font-weight:600}
+.mem-t small{font:400 11.5px/1.4 var(--f-mono);color:var(--muted)}
+.mem-t textarea{min-height:64px;font:400 14.5px/1.45 var(--f-ui);border-radius:10px;padding:8px 10px}
+.mem-b{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center}
+.mem.pinned .mem-t > span::before{content:"•";color:var(--accent);margin-right:6px}
+.mem > .confirm{grid-column:1 / -1}
+.mem-group h4{font:600 13px var(--f-ui);color:var(--muted);margin:0 0 2px}
+.know-add{display:flex;flex-direction:column;gap:8px}
+.know-add input{height:40px;border-radius:12px;padding:0 13px}
+.know-add .row{flex-wrap:wrap;gap:8px;align-items:center}
+.know-add select{width:auto;padding:7px 10px;border-radius:10px}
+.attn{gap:10px}
+.attn-row{font-size:14.5px;line-height:2.1;color:var(--ink-2);max-width:62ch}
+.attn-row select{display:inline-block;width:auto;padding:3px 6px;margin:0 2px;border-radius:8px;font:500 13.5px var(--f-ui);vertical-align:baseline}
+.lead-intro{max-width:62ch;font-size:14px;line-height:1.5}
+@media (max-width:560px){.mem{grid-template-columns:minmax(0,1fr)}.mem-b{justify-content:flex-start}}

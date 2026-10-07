@@ -139,7 +139,7 @@ function runBtn(d, j) {
 function jobCardHtml(d, j) {
   const k = cssKey(j.id), id = esc(j.id), more = S.jobOpen[j.id], rules = j.rules || [], cmd = isCommandJob(j);
   const head = cmd ? `<div class="job-h"><b class="cmd">${esc(j.run)}</b><span>in</span><b>${esc(jobTitle(j))}</b><span class="mono">${esc(j.repo)}</span><span class="grow"></span>${runBtn(d, j)}</div>`
-    : `<div class="job-h"><b>${esc(jobTitle(j))}</b><span class="grow"></span>${runBtn(d, j)}</div><p class="job-task">${esc(j.task || "")}</p>`;
+    : `<div class="job-h"><b>${esc(jobTitle(j))}</b><span class="grow"></span>${runBtn(d, j)}</div><p class="job-task">${esc(j.task || "")}</p>${j.learn ? `<p class="fine">It reads only what you do and say in Atoms, never your apps, and keeps nothing until you say yes.</p>` : ""}`;
   const taskEdit = cmd ? "" : `<label class="eyebrow" for="jt-${k}">What it does</label><textarea id="jt-${k}" data-jobtask="${id}" maxlength="900">${esc(S.edits["jobtask:" + j.id] ?? j.task ?? "")}</textarea>`;
   return `<article class="jobcard" data-key="${id}">${head}
     <section class="card cloud-card" id="cloud-${k}"></section>
@@ -220,7 +220,7 @@ const subFor = a => { const d = S.dots.find(x => x.id === a.dotId), j = S.jobs.f
 export function decisionsSig(grp) { const s = grp[0] ? subFor(grp[0]) : null; return JSON.stringify([grp.map(a => [a.id, a.state, a.title, a.why, a.answer?.text, !!S.busy[a.id]]), s ? firingFor(s) : false, Math.floor(Date.now() / 60000)]); }
 export function decisionsHtml(grp, o: { inChat?: boolean } = {}) {
   const a0 = grp[0], d = S.dots.find(x => x.id === a0.dotId), j = S.jobs.find(x => x.id === a0.jobId);
-  const open = grp.filter(a => a.state === "pending"), yes = grp.filter(saidYes).length;
+  const open = grp.filter(a => a.state === "pending" || a.state === "held"), yes = grp.filter(saidYes).length;
   const head = clean(a0.question?.group || "").slice(0, 120) || (grp.length > 1 ? "Needs your say" : clean(a0.title));
   const who = o.inChat ? "" : `${d ? avatarHtml(d, { size: 18 }) : ""}<span>${esc(d?.name || "An atom")}</span><span>·</span>`;
   const s = subFor(a0), firing = s ? firingFor(s) : false, nm = esc(d?.name || "It");
@@ -236,7 +236,7 @@ export function decisionsHtml(grp, o: { inChat?: boolean } = {}) {
 function decisionRow(a) {
   const q = questionOf(a), id = esc(a.id), busy = !!S.busy[a.id], src = SRC[a.about?.source] || "";
   const label = `<span class="dec-src">${esc(src)}</span>`;
-  if (a.state !== "pending") {
+  if (a.state !== "pending" && a.state !== "held") {
     const said = a.answer?.text || (a.state === "dismissed" ? "Not now" : "Done"), no = !!a.answer && !saidYes(a);
     return `<li class="dec done">${label}<span class="dec-t"><b>${esc(a.title)}</b></span><span class="dec-said ${no ? "no" : ""}">${no ? "–" : "✓"} ${esc(said)}</span></li>`;
   }
@@ -246,7 +246,7 @@ function decisionRow(a) {
 
 /* every question from a job's run is answered: start a short follow-up run of that job, once */
 export async function afterJobAnswer(a) {
-  const qs = runQuestions(a); if (qs.some(x => x.state === "pending")) return;
+  const qs = runQuestions(a); if (qs.some(x => x.state === "pending" || x.state === "held")) return;
   const d = S.dots.find(x => x.id === a.dotId), j = S.jobs.find(x => x.id === a.jobId); if (!d || !j) return;
   const yes = qs.filter(saidYes).length, decisions = qs.every(isDecision);
   if (!yes) { toast("All skipped. Nothing to do."); return; }

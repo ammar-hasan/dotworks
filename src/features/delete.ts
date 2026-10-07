@@ -3,6 +3,8 @@ import { diag } from "../core/diag";
 import { toast } from "../core/helpers";
 import { NS, S, cloudOn, jobsOf, runsCol, userDoc } from "../core/state";
 import { go } from "../ui/nav";
+import { isLead } from "../ui/characters";
+import { forgetAll } from "./memory";
 import { renderAll } from "../ui/shell";
 
 /* ═════════ delete ═════════ */
@@ -38,5 +40,7 @@ export async function deleteDot(did) {
     for (const id of asks) await userDoc(id).delete().catch(() => {});
     for (const j of jobs) await userDoc(j.id).delete().catch(() => {});
     if (d.notesAssetId) NS.assets?.delete(d.notesAssetId).catch(() => {});
+    // your super atom takes what it knew about you with it
+    if (isLead(d)) await forgetAll();
   })();
 }

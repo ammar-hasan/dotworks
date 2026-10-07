@@ -7,6 +7,7 @@ import { restoreHot } from "./hot";
 import { setPresence, startRoom } from "./room";
 import { NS, S, cloudOn, connPerm, lastAt, runsCol, userDoc } from "./state";
 import { loadTriggers, paintCloud } from "../features/cloud";
+import { ensureReads, releaseHeld } from "../features/attention";
 import { jobSpecOf } from "../features/jobs";
 import { renderAcct } from "../ui/account";
 import { lookOf } from "../ui/characters";
@@ -99,7 +100,8 @@ export function subscribe() {
     if (S.needDot) { const id = S.needDot; S.needDot = null; if (S.dots.some(d => d.id === id)) openDot(id, S.tab); }
     // leave a dot's page only when a dot we had really went away (deleted here or in another tab)
     if (S.view === "dot" && S.seen.has(S.selected) && !S.dots.some(d => d.id === S.selected)) go("home");
-    loadLatest(); renderAll();
+    loadLatest(); renderAll(); ensureReads();
+    if (S.actions.some(a => a.state === "held")) releaseHeld();
     if (S.dots.some(d => cloudOn(d) || d.cloudPending) && connPerm(SRV.cloud) === "granted" && !S.triggers) loadTriggers();
   }, e => { diag("db.dots", e); S.dotsLoaded = true; renderAll(); });
   col.where("type", "==", "job").onSnapshot(snap => {
@@ -110,7 +112,16 @@ export function subscribe() {
   col.where("type", "==", "action").onSnapshot(snap => {
     S.actions = snap.docs.map(x => ({ id: x.id, ...clone(x.data()) })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     renderAll(); setPresence();
+    // with a super atom, what was held back comes back as you clear what's waiting
+    if (S.actions.some(a => a.state === "held")) releaseHeld();
   }, e => diag("db.actions", e));
+  // what the super atom knows about you, what you've read, and its pings (features/memory.ts, attention.ts)
+  col.where("type", "==", "memory").onSnapshot(snap => {
+    S.memory = snap.docs.map(x => ({ id: x.id, ...clone(x.data()) })).filter(m => typeof m.text === "string");
+    S.memoryLoaded = true; renderAll();
+  }, e => { S.memoryLoaded = true; diag("db.memory", e); });
+  userDoc("reads").onSnapshot(snap => { S.reads = snap.exists ? clone(snap.data()) : null; S.readsLoaded = true; if (!snap.exists) ensureReads(); renderAll(); }, e => diag("db.reads", e));
+  userDoc("pings").onSnapshot(snap => { S.pings = snap.exists ? clone(snap.data()) : null; renderAll(); }, e => diag("db.pings", e));
 }
 export function sanitizeSeed(t) {
   if (!t || typeof t !== "object" || !t.id || !t.name) return null;

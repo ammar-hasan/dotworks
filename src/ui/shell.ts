@@ -4,7 +4,7 @@ import { $, esc, fmtWhen, hueOf, plural, reconcile, span } from "../core/helpers
 import { NS, S, cloudOn, curDot, jobDriven, isDue, jobsOf, pending } from "../core/state";
 import { cloudFiringFor, missingApps } from "../features/cloud";
 import { renderAcct } from "./account";
-import { avatarHtml, stateOf } from "./characters";
+import { isLead, avatarHtml, stateOf } from "./characters";
 import { renderSheet } from "../views/builder";
 import { renderView } from "../views/index";
 
@@ -73,7 +73,8 @@ export function renderDotList(box, where) {
   if (!S.uid) { box.innerHTML = `<div class="dl-empty">${NS.user ? "Sign in to Claude to make atoms." : "Open Atoms inside Claude to make atoms."}</div>`; return; }
   if (!S.dotsLoaded) { box.innerHTML = '<div class="dl-empty"><div class="skel" style="width:70%"></div></div>'; return; }
   if (!S.dots.length) { const msg = `<div class="dl-empty" data-key="empty">No atoms yet. Add one from Elements or make your own.</div>`; if (box.innerHTML !== msg) box.innerHTML = msg; return; }
-  reconcile(box, S.dots.map(d => {
+  // your super atom first
+  reconcile(box, [...S.dots.filter(isLead), ...S.dots.filter(d => !isLead(d))].map(d => {
     const [st, cl] = dotStatus(d), asks = pending().filter(a => a.dotId === d.id).length;
     const html = `<button class="dl-i" data-key="${esc(d.id)}" data-act="open-dot" data-id="${esc(d.id)}" aria-current="${S.view === "dot" && S.selected === d.id}">${avatarHtml(d, { size: where === "side" ? 34 : 40, state: stateOf(d), badge: asks || "" })}<span class="dl-t"><b>${esc(d.name)}</b><small class="${cl}">${esc(st)}</small></span><span></span></button>`;
     return { key: d.id, html, sig: html };

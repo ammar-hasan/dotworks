@@ -13,12 +13,16 @@ import { cancelAutoSend, dictationPaused, listen, setVoiceMode, speak, stopListe
 import { cloudAct, cloudCreate, cloudFind, cloudPlan, loadTriggers, paintCloud, subOf } from "../features/cloud";
 import { curJob, jobDraft, jobRepoList, removeJob, runJob, runJobs, runMain, saveJob, saveNewJob, setCheckins } from "../features/jobs";
 import { deleteDot } from "../features/delete";
+import { leadOf, saveAttention } from "../features/attention";
+import { applyMemoryAnswer, clearRejected, forget, memAdd, memText, memUpdate } from "../features/memory";
+import { openExistingLead } from "../features/lead";
 import { allow, closeAcct, renderAcct } from "./account";
 import { lookOf } from "./characters";
 import { cycle, go, openDot } from "./nav";
 import { renderAll } from "./shell";
 import { paintApps, toggleApp } from "../views/apps";
-import { closeSheet, draftOf, draftWithClaude, openNew, paintPeoplePicker, paintRepoField, prefixOf, refreshLook, repoListHtml, saveBuilder, searchPeople } from "../views/builder";
+import { closeSheet, draftOf, draftWithClaude, openLead, openNew, paintPeoplePicker, paintRepoField, prefixOf, refreshLook, repoListHtml, saveBuilder, searchPeople } from "../views/builder";
+import { paintKnow } from "../views/know";
 import { paintComposer } from "../views/dot";
 import { renderField } from "../views/home";
 import { renderHorizon, startDay, watchDay } from "../views/horizon";
@@ -102,7 +106,7 @@ document.addEventListener("click", ev => {
       NS.room.sendToClaudeSession(fitBytes({ label: `Note from ${clean(d.name)}`.slice(0, 120), dot: clean(d.name), dotId: d.id, runId: r.id, written: fmtWhen(r.startedAt), note: clean(r.text).slice(0, 2600) }))
         .then(() => toast("Added to your Claude message — ask away"), e => { diag("room.stage", e); toast(e?.code === "claude_unavailable" ? "No Claude conversation is open beside this page." : "Couldn't add it."); refreshCanSend(); });
       break; }
-    case "clear-done": (async () => { for (const a of S.actions.filter(x => x.state !== "pending")) await userDoc(a.id).delete().catch(() => {}); })(); break;
+    case "clear-done": (async () => { for (const a of S.actions.filter(x => x.state !== "pending" && x.state !== "held")) await userDoc(a.id).delete().catch(() => {}); })(); break;
     case "export": {
       const r = S.runs.find(x => x.id === id); if (!r || !NS.downloads || !d) break;
       if (menu) menu.open = false;
@@ -151,6 +155,20 @@ document.addEventListener("click", ev => {
     case "job-remove": if (job) { S.jobOpen["rm:" + job.id] = true; S.jobOpen[job.id] = true; paintCloud(); } break;
     case "job-remove-no": if (job) { delete S.jobOpen["rm:" + job.id]; paintCloud(); } break;
     case "job-remove-yes": if (job) { delete S.jobOpen["rm:" + job.id]; removeJob(job); } break;
+    // the super atom: make it (or open the one you have), and its You tab
+    case "lead-new": if (!openExistingLead()) openLead(); break;
+    case "held-toggle": S.showHeld = !S.showHeld; renderAll(); break;
+    case "mem-answer": { const m = S.memory.find(x => x.id === id), q = m?.askId ? S.actions.find(a => a.id === m.askId) : null, c = b.dataset.choice;
+      if (!m || !["keep", "all", "no"].includes(c)) break;
+      if (q && (q.state === "pending" || q.state === "held")) answerQuestion(q.id, c); else applyMemoryAnswer({ id: m.askId || "", memoryId: m.id }, c); break; }
+    case "mem-pin": { const m = S.memory.find(x => x.id === id); if (m) memUpdate(id, { pinned: !m.pinned }, m.pinned ? "Unpinned" : "Pinned: it always reaches your atoms first"); break; }
+    case "mem-edit": { const m = S.memory.find(x => x.id === id); if (m) { S.knowEdit[id] = memText(m.text); paintKnow(true); setTimeout(() => ($(`#me-${cssKey(id)}`) as any)?.focus(), 0); } break; }
+    case "mem-cancel": delete S.knowEdit[id]; (document.activeElement as any)?.blur?.(); paintKnow(true); break;
+    case "mem-save": { const t = memText(S.knowEdit[id]); if (t.length < 6) { toast("Say it in a sentence."); break; } delete S.knowEdit[id]; (document.activeElement as any)?.blur?.(); memUpdate(id, { text: t, editedAt: Date.now() }, "Saved"); paintKnow(true); break; }
+    case "mem-forget": S.knowOpen["rm:" + id] = true; paintKnow(true); break;
+    case "mem-forget-no": delete S.knowOpen["rm:" + id]; paintKnow(true); break;
+    case "mem-forget-yes": delete S.knowOpen["rm:" + id]; forget(id); break;
+    case "mem-clear-no": clearRejected(); break;
   }
 });
 // a job's instructions stay open while you edit them, whatever repaints around them
@@ -176,6 +194,7 @@ document.addEventListener("input", ev => {
   if ((t as any).dataset?.jobf) { const d = curDot(), k = (t as any).dataset.jobf; if (d && ["run", "task", "title"].includes(k)) { jobDraft(d)[k] = (t as any).value; if (k === "run") { const l = $("#jb-rlist"); if (l) l.innerHTML = jobRepoList(d); } } }
   if ((t as any).dataset?.jobrules) S.edits["job:" + (t as any).dataset.jobrules] = (t as any).value;
   if ((t as any).dataset?.jobtask) S.edits["jobtask:" + (t as any).dataset.jobtask] = (t as any).value;
+  if ((t as any).dataset?.memedit && (t as any).dataset.memedit in S.knowEdit) S.knowEdit[(t as any).dataset.memedit] = (t as any).value;
   if ((t as any).id === "reply") { autosize(t); dictationPaused(() => { S.handsFree = false; sendReply(); }); }
 });
 document.addEventListener("change", ev => {
@@ -184,6 +203,8 @@ document.addEventListener("change", ev => {
   if ((t as any).id === "replyImg") { const file = (t as any).files?.[0]; if (file) { S.replyImage = file; paintComposer(); } (t as any).value = ""; }
   if ((t as any).dataset?.f === "src" && f) f.sources = [...document.querySelectorAll(`#${prefixOf(mode)}-srcs input[data-src]`)].filter(x => (x as any).checked).map(x => (x as any).dataset.src);
   if ((t as any).dataset?.f && (t as any).tagName === "SELECT" && f) f[(t as any).dataset.f] = (t as any).value;
+  if ((t as any).dataset?.att) saveAttention((t as any).dataset.att, (t as any).value);
+  if ((t as any).dataset?.memprivate) memUpdate((t as any).dataset.memprivate, { private: !!(t as any).checked });
   if ((t as any).dataset?.cloud) {
     const d = curDot(), jid = (t as any).dataset.job, j = jid ? curJob(jid) : null;
     if (d && (!jid || j)) { const s = subOf(d, j), p = cloudPlan(s); S.cloudDraft[s.id] = { when: p.when, hour: p.hour, push: p.push, [(t as any).dataset.cloud]: (t as any).type === "checkbox" ? (t as any).checked : (t as any).value }; paintCloud(); }
@@ -198,6 +219,7 @@ document.addEventListener("submit", ev => {
   if ((ev.target as any).classList.contains("builder")) saveBuilder((ev.target as any).dataset.draft);
   if ((ev.target as any).id === "composer") { cancelAutoSend(); S.handsFree = false; sendReply(); }
   if ((ev.target as any).id === "tell") { const inp = $("#tellIn"), v = inp?.value || ""; if (v.trim()) { inp.value = ""; tellDots(v); } }
+  if ((ev.target as any).id === "knowAdd") { const inp = $("#knowIn") as any, v = inp?.value || ""; if (v.trim() && leadOf()) memAdd(v, ($("#knowKind") as any)?.value || "preference", ($("#knowScope") as any)?.value || "all").then(ok => { if (ok) { const i = $("#knowIn") as any; if (i) i.value = ""; paintKnow(true); } }); }
 });
 document.addEventListener("paste", ev => { if ((ev.target as any).id !== "reply" || !S.imagesOK) return; const f = [...(ev.clipboardData?.files || [])].find(x => x.type.startsWith("image/")); if (f) { S.replyImage = f; paintComposer(); } });
 document.addEventListener("keydown", ev => {
@@ -222,7 +244,7 @@ document.addEventListener("keydown", ev => {
 document.addEventListener("keydown", ev => {
   // arrow keys move between tabs (tablist pattern)
   const t = ev.target; if (!(t as any).matches?.('#dvTabs [role="tab"]') || !["ArrowLeft", "ArrowRight"].includes(ev.key)) return;
-  const tabs = ["chat", "activity", "schedule", "settings"], i = tabs.indexOf(S.tab);
+  const tabs = [...document.querySelectorAll('#dvTabs [role="tab"]')].map(x => (x as any).dataset.tab), i = tabs.indexOf(S.tab);
   S.tab = tabs[(i + (ev.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length]; renderAll(); $(`#tab-${S.tab}`)?.focus(); ev.preventDefault();
 });
 window.addEventListener("resize", () => { if (S.view === "home") renderField(); });

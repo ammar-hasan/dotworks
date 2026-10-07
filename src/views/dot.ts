@@ -8,7 +8,10 @@ import { decisionsHtml, decisionsSig, groupKey, groupOf, isDecision, jobTitle } 
 import { receiptHtml } from "../features/receipts";
 import { canListen, canSpeak } from "../features/voice";
 import { appsMissingFor, cloudFiringFor, paintCloud } from "../features/cloud";
-import { avatarHtml, lookOf, stateOf } from "../ui/characters";
+import { avatarHtml, isLead, lookOf, stateOf } from "../ui/characters";
+import { markRead } from "../features/attention";
+import { candidateMem } from "../features/memory";
+import { paintKnow } from "./know";
 import { dotStatus } from "../ui/shell";
 import { builderHtml, draftFromDot, paintPeoplePicker } from "./builder";
 
@@ -37,13 +40,18 @@ export function paintDot() {
       <button class="danger" data-act="delete-dot">Delete…</button></div></details>`;
   const actBox = $("#dvAct"), wasOpen = !!$("#dvMenu")?.open;
   if (actBox.dataset.sig !== act) { actBox.innerHTML = act; actBox.dataset.sig = act; if (wasOpen) $("#dvMenu").open = true; }
-  $("#dvConfirm").innerHTML = S.confirmDel ? `<span>Delete ${esc(d.name)}, its notes${jobs.length ? `, its ${plural(jobs.length, "job")}` : ""}${cloud ? ` and ${jobs.length ? "their" : "its"} cloud schedule${jobs.filter(cloudOn).length > 1 ? "s" : ""}` : ""}?</span><button class="btn danger sm" data-act="confirm-del">Delete</button><button class="btn ghost sm" data-act="cancel-del">Keep it</button>` : "";
-  const asks = pending().filter(a => a.dotId === d.id).length;
-  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ["activity", "Activity", ""], ["schedule", "Jobs", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
+  $("#dvConfirm").innerHTML = S.confirmDel ? `<span>Delete ${esc(d.name)}, its notes${jobs.length ? `, its ${plural(jobs.length, "job")}` : ""}${cloud ? ` and ${jobs.length ? "their" : "its"} cloud schedule${jobs.filter(cloudOn).length > 1 ? "s" : ""}` : ""}${isLead(d) ? ", and everything it knows about you" : ""}?</span><button class="btn danger sm" data-act="confirm-del">Delete</button><button class="btn ghost sm" data-act="cancel-del">Keep it</button>` : "";
+  // what waits in its chat (a super atom's "Is this right?" counts on its You tab instead)
+  const asks = pending().filter(a => a.dotId === d.id && !a.memoryId).length;
+  // the super atom has one more tab: what it knows about you, and your attention budget
+  const lead = isLead(d), cands = lead ? candidateMem().length : 0;
+  if (!lead && S.tab === "know") S.tab = "chat";
+  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ...(lead ? [["know", "You", cands ? `<span class="count" title="Waiting for your yes">${cands}</span>` : ""]] : []), ["activity", "Activity", ""], ["schedule", "Jobs", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
   const th = tabs.map(([k, l, extra]) => `<button role="tab" id="tab-${k}" data-tab="${k}" aria-controls="tp-${k}" aria-selected="${S.tab === k}" tabindex="${S.tab === k ? 0 : -1}">${l}${extra}</button>`).join("");
   if ($("#dvTabs").innerHTML !== th) $("#dvTabs").innerHTML = th;
-  for (const k of ["chat", "activity", "schedule", "settings"]) $("#tp-" + k).hidden = S.tab !== k;
-  if (S.tab === "chat") { paintChat(); paintComposer(); }
+  for (const k of ["chat", "know", "activity", "schedule", "settings"]) $("#tp-" + k).hidden = S.tab !== k;
+  if (S.tab === "chat") { paintChat(); paintComposer(); if (S.runsLoaded) markRead(d); }
+  else if (S.tab === "know") paintKnow();
   else if (S.tab === "activity") paintActivity();
   else if (S.tab === "schedule") paintCloud();
   else paintSettings();
@@ -93,7 +101,7 @@ export function paintChat() {
       else { shown.add(it.a.id); blocks.push(askBlock(it.a)); }
     }
   }
-  for (const a of myActs.filter(a => a.state === "pending" && !shown.has(a.id)).reverse()) blocks.push(isDecision(a) ? decisionBlock(a, shown) : askBlock(a));
+  for (const a of myActs.filter(a => (a.state === "pending" || a.state === "held") && !shown.has(a.id)).reverse()) blocks.push(isDecision(a) ? decisionBlock(a, shown) : askBlock(a));
   if (S.running?.dotId === d.id) {
     const lv = S.running, lj = lv.jobId ? S.jobs.find(j => j.id === lv.jobId) : null;
     blocks.push({ key: "live", sig: JSON.stringify([lv.steps, lv.text, lv.jobId]), html: `<div class="msg dot" data-key="live"><span class="m-av">${avatarHtml(d, { size: 30, state: stateOf(d) })}</span><div class="m-body"><div class="m-meta">${esc(d.name)} · ${lv.jobId ? `<span class="job-tag">${esc(lj ? jobTitle(lj) : "a job")}</span> · running now` : "awake now"}</div>${threadHtml(lv.steps)}${lv.text ? `<div class="letter">${md(lv.text)}</div>` : `<div class="typing"><i></i><i></i><i></i><span>${lv.steps.length ? "putting the note together" : "waking up — the first time, Claude asks you to allow it and the apps it reads"}</span></div>`}</div></div>` });
@@ -121,7 +129,8 @@ export function decisionBlock(a, shown: Set<string>) {
   return { key: "grp:" + groupKey(a), sig: decisionsSig(grp), html: `<div class="msg ask-row" data-key="grp:${esc(groupKey(a))}"><span class="m-av"></span><div class="m-body">${decisionsHtml(grp, { inChat: true })}</div></div>` };
 }
 export function askBlock(a) {
-  if (a.state === "pending") return { key: "ask:" + a.id, sig: askSig(a), html: `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body">${askHtml(a, { inChat: true })}</div></div>` };
+  // a held-back ask shows in full here too, marked held back: you can act on it any time
+  if (a.state === "pending" || a.state === "held") return { key: "ask:" + a.id, sig: askSig(a), html: `<div class="msg ask-row" data-key="ask:${esc(a.id)}"><span class="m-av"></span><div class="m-body">${askHtml(a, { inChat: true })}</div></div>` };
   const ok = a.state === "done" || a.state === "handed_off";
   // an answered question reads as the question and your answer; the dot's reply follows in the thread
   if (a.kind === "question" && a.state === "done" && a.answer?.text) {

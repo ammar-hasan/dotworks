@@ -8,20 +8,28 @@ import { $, ago, clean, esc, handleOf, hueOf, newId, tierOf, toast, upsertLocal 
 import { NS, S, jobDriven, userDoc } from "../core/state";
 import { addJobs } from "../features/jobs";
 import { closeAcct } from "../ui/account";
-import { avatarHtml, lookOf } from "../ui/characters";
+import { LEAD_ORBITS, avatarHtml, isLead, lookOf } from "../ui/characters";
+import { afterLeadMade, leadDraft } from "../features/lead";
+import { leadOf } from "../features/attention";
 import { openDot } from "../ui/nav";
 import { renderAll } from "../ui/shell";
 import { canSpeak, voices } from "../features/voice";
 import { cantSave, recordAdopt, rememberNew } from "./seeds";
 
 /* ─── builder: make / change a dot ─── */
-export function draftFromDot(d) { return { id: d.id, jobbed: jobDriven(d), voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
+export function draftFromDot(d) { return { id: d.id, role: isLead(d) ? "lead" : null, jobbed: jobDriven(d), voiceName: d.voice?.name || "", name: d.name, responsibility: d.responsibility, rulesText: (d.rules || []).join("\n"), sources: normSources(d.sources), cadence: d.cadence || "daily", tier: tierOf(d), hue: hueOf(d), look: lookOf(d), vips: (d.vips || []).slice(), notesName: d.notesName || null, repoMode: normRepos(d.repos).mode, repoList: normRepos(d.repos).list, rev: 0 }; }
 export function blankDraft() { const hue = Math.floor(Math.random() * 360); return { pid: newId("dot_"), voiceName: "", name: "", responsibility: "", rulesText: "", sources: ["Google Calendar", "Gmail"].filter(n => appsAvail().includes(n)), cadence: "daily", tier: "default", hue, look: { shape: SHAPES[hue % 4], eyes: "round", acc: "none" }, vips: [], ask: "", repoMode: "none", repoList: [], rev: 0 }; }
 export function openNew(seed) {
   if (cantSave()) return;
   S.formDraft = seed ? { pid: newId("dot_"), voiceName: "", name: seed.name, responsibility: seed.responsibility, rulesText: seed.rules.join("\n"), sources: normSources(seed.sources), cadence: seed.cadence, tier: seed.tier, hue: seed.hue, look: { ...seed.look }, vips: [], seedKey: seed.key, job: seed.job || null, repoMode: seed.job ? "some" : "none", repoList: [], rev: 0 } : blankDraft();
   S.formFile = null; S.sheet = { kind: seed ? "plant" : "new" }; closeAcct(false); renderSheet();
   setTimeout(() => (seed ? $("#sh-name") : $("#sh-ask") || $("#sh-name"))?.focus({ preventScroll: true }), 120);
+}
+/* your super atom: one per person, made from its own form (features/lead.ts) */
+export function openLead() {
+  if (cantSave()) return;
+  S.formDraft = leadDraft(); S.formFile = null; S.sheet = { kind: "lead" }; closeAcct(false); renderSheet();
+  setTimeout(() => $("#sh-name")?.focus({ preventScroll: true }), 120);
 }
 export function closeSheet() { S.sheet = null; S.formDraft = null; S.formFile = null; renderSheet(); }
 export let sheetKey = "";
@@ -42,16 +50,18 @@ export function lookBlock(f, p) {
       <div class="pick"><span class="eyebrow">Shape</span><div class="opts">${SHAPES.map(v => opt("shape", v)).join("")}</div></div>
       <div class="pick"><span class="eyebrow">Eyes</span><div class="opts">${EYES.map(v => opt("eyes", v)).join("")}</div></div>
       <div class="pick"><span class="eyebrow">Wears</span><div class="opts">${ACCS.map(v => opt("acc", v)).join("")}</div></div>
+      ${f.role === "lead" ? `<div class="pick"><span class="eyebrow">Orbits</span><div class="opts">${LEAD_ORBITS.map(v => `<button type="button" class="opt" data-look="orbits" data-v="${v}" aria-pressed="${(look.orbits || "three") === v}" aria-label="orbits ${v}" title="${v === "three" ? "three orbits" : v === "ring" ? "one ring, three electrons" : "two crossed orbits"}">${avatarHtml({ ...f, id: f.id || "preview", look: { ...look, orbits: v, acc: "none" } }, { size: 32 })}</button>`).join("")}</div></div>` : ""}
       <div class="pick"><label class="eyebrow" for="${p}-hue">Colour</label><input type="range" id="${p}-hue" data-f="hue" min="0" max="359" value="${hueOf(f)}"></div>
       ${canSpeak() && voices().length ? `<div class="pick"><label class="eyebrow" for="${p}-voice">Voice</label><div class="row voice-pick"><select id="${p}-voice" data-f="voiceName"><option value="">Its own (picked for it)</option>${voices().map(v => `<option value="${esc(v.name)}" ${f.voiceName === v.name ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select><button type="button" class="btn ghost sm" data-act="voice-try" data-mode="${p === "sh" ? "new" : "edit"}">${ICON.voice}Hear it</button></div></div>` : ""}
     </div>`;
 }
 export function builderHtml(f, mode) {
   const p = mode === "new" ? "sh" : "st", editing = mode === "edit";
-  const title = editing ? "Settings" : S.sheet?.kind === "plant" ? "Add it" : "Make an atom";
+  const title = editing ? "Settings" : S.sheet?.kind === "plant" ? "Add it" : S.sheet?.kind === "lead" ? "Your super atom" : "Make an atom";
   return `<form class="builder" id="${p}-form" data-draft="${mode}" novalidate>
     <div class="b-head"><h2 id="${p}-title">${title}</h2>${editing ? "" : `<button type="button" class="icon-btn" data-act="close-sheet" aria-label="Close">${ICON.close}</button>`}</div>
-    ${NS.sample && !editing && S.sheet?.kind !== "plant" ? `<div class="spark"><label class="eyebrow" for="sh-ask">Say what you want watched</label><div class="row"><input type="text" id="sh-ask" data-f="ask" value="${esc(f.ask || "")}" placeholder="Warn me about this week's meetings that have no agenda" style="flex:1;min-width:200px"><button class="btn pri" type="button" data-act="draft-ai" id="sh-draftBtn">Shape it</button></div><span class="note" id="sh-draftNote">Claude fills in everything below — name, job, rules, even a look. You check it before it joins your field.</span></div>` : ""}
+    ${!editing && S.sheet?.kind === "lead" ? `<p class="note lead-intro">One atom that looks across all your others. It learns how you like to work from what you tell it and what you do with asks, and keeps that on a page only you see. Every few hours it may ping you, only when something is worth it and never past the budget you set. Like every atom, it only asks, and you decide.</p>` : ""}
+    ${NS.sample && !editing && S.sheet?.kind !== "plant" && S.sheet?.kind !== "lead" ? `<div class="spark"><label class="eyebrow" for="sh-ask">Say what you want watched</label><div class="row"><input type="text" id="sh-ask" data-f="ask" value="${esc(f.ask || "")}" placeholder="Warn me about this week's meetings that have no agenda" style="flex:1;min-width:200px"><button class="btn pri" type="button" data-act="draft-ai" id="sh-draftBtn">Shape it</button></div><span class="note" id="sh-draftNote">Claude fills in everything below — name, job, rules, even a look. You check it before it joins your field.</span></div>` : ""}
     <div class="b-look" id="${p}-look">${lookBlock(f, p)}</div>
     <div class="two"><div class="field-i"><label class="eyebrow" for="${p}-name">Name</label><input type="text" id="${p}-name" data-f="name" maxlength="40" value="${esc(f.name)}" placeholder="Meeting prep"></div>
       <div class="field-i"><span class="eyebrow">Handle</span><div class="note mono" id="${p}-handle" style="padding:11px 0">${esc(handleOf(f))}</div></div></div>
@@ -63,7 +73,7 @@ export function builderHtml(f, mode) {
       <div class="field-i"><label class="eyebrow" for="${p}-tier">Mind</label><select id="${p}-tier" data-f="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}" ${tierOf(f) === k ? "selected" : ""}>${v}${k === "complex" ? " · slower" : k === "quick" ? " · lightest" : ""}</option>`).join("")}</select></div></div>
     ${NS.user ? `<div class="field-i"><label class="eyebrow" for="${p}-people">People who matter · optional</label><div class="people-pick"><div class="people" id="${p}-vips"></div><input type="text" id="${p}-people" data-people="${mode}" placeholder="Search your organization" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="${p}-plist" aria-autocomplete="list"><div class="plist" id="${p}-plist" role="listbox" hidden></div></div><span class="note">Their mail comes first. Only their ids are saved.</span></div>` : ""}
     ${NS.assets ? `<div class="field-i"><label class="eyebrow" for="${p}-file">Something it should know · optional</label><input type="file" id="${p}-file" data-file="${mode}" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json"><span class="note" id="${p}-fileNote">${f.notesName ? `Knows <b>${esc(f.notesName)}</b> now. Pick another file to replace it, or <button type="button" class="link" data-act="drop-file" data-id="${mode}">remove it</button>.` : "A .txt, .md, .csv or .json it rereads every time, like your team roster."}</span></div>` : ""}
-    <div class="row b-foot"><button class="btn pri" type="submit" id="${p}-save">${editing ? "Save changes" : S.sheet?.kind === "plant" ? "Add it" : "Make it"}</button>${editing ? "" : `<button type="button" class="btn ghost" data-act="close-sheet">Cancel</button>`}<span class="err" id="${p}-err" role="alert"></span></div>
+    <div class="row b-foot"><button class="btn pri" type="submit" id="${p}-save">${editing ? "Save changes" : S.sheet?.kind === "plant" ? "Add it" : S.sheet?.kind === "lead" ? "Add it" : "Make it"}</button>${editing ? "" : `<button type="button" class="btn ghost" data-act="close-sheet">Cancel</button>`}<span class="err" id="${p}-err" role="alert"></span></div>
   </form>`;
 }
 export function repoListHtml(f, mode) {
@@ -147,6 +157,8 @@ export async function saveBuilder(mode) {
   if (!NS.db || !S.uid) { err.textContent = "Open this page inside Claude, signed in, to save atoms."; return; }
   const btn = $(`#${p}-save`); btn.disabled = true; err.textContent = "";
   const prev = mode === "edit" ? S.dots.find(d => d.id === f.id) : null, id = prev ? prev.id : f.pid || newId("dot_");
+  const newLead = !prev && f.role === "lead";
+  if (newLead && leadOf()) { err.textContent = `You already have a super atom: ${leadOf().name}.`; btn.disabled = false; return; }
   const jobSpec = !prev && f.job ? f.job : null;
   if (jobSpec && !(f.repoList || []).length) { err.textContent = "Pick at least one repo for it to work in."; btn.disabled = false; return; }
   if (!jobSpec && !f.jobbed && f.repoMode === "some" && !(f.repoList || []).length) { err.textContent = "Pick at least one repo, or choose None."; btn.disabled = false; return; }
@@ -165,14 +177,16 @@ export async function saveBuilder(mode) {
     } else if (f.dropFile && prev?.notesAssetId) { oldAsset = prev.notesAssetId; (fields as any).notesAssetId = null; (fields as any).notesName = null; fileChanged = true; }
     if (prev) { await userDoc(id).update(fields); upsertLocal(S.dots, id, fields); }
     else {
-      const body = { type: "dot", ...fields, notesAssetId: (fields as any).notesAssetId || null, notesName: (fields as any).notesName || null, createdAt: Date.now(), lastRunAt: null, lastStatus: null };
+      const body = { type: "dot", ...fields, ...(newLead ? { role: "lead" } : {}), notesAssetId: (fields as any).notesAssetId || null, notesName: (fields as any).notesName || null, createdAt: Date.now(), lastRunAt: null, lastStatus: null };
       await userDoc(id).set(body); rememberNew(id, body);
       if (jobSpec) await addJobs({ id, ...body }, f.repoList || [], jobSpec.run);
+      if (newLead) await afterLeadMade({ id, ...body });
     }
     if (oldAsset && oldAsset !== (fields as any).notesAssetId) NS.assets?.delete(oldAsset).catch(() => {});
     if (f.seedKey) recordAdopt(f.seedKey);
     if (fileChanged) refreshAssets();
     if (mode === "new" && jobSpec) { closeSheet(); openDot(id, "schedule"); toast(`${name} is ready. Give each job a schedule.`); }
+    else if (newLead) { closeSheet(); openDot(id, "know"); toast(`${name} is ready. Tell it about how you work, or give it a schedule on its Jobs tab for pings.`); }
     else if (mode === "new") { closeSheet(); openDot(id, "chat"); toast(`${name} is ready`, { label: "Wake it", fn: () => runDot(id) }); }
     else { S.editDraft = null; S.editFile = null; S.settingsKey = ""; toast("Saved"); renderAll(); }
   } catch (e) {

@@ -17,6 +17,8 @@ const init = {
   day: null, dayErr: null, dayKey: null, dayUnsub: null, hzSel: null,
   tell: null as null | Record<string, any>, cheer: {} as Record<string, number>, voiceOn: false, speaking: null as null | string, listening: false, micBlocked: false, handsFree: false, pendingSend: null as null | { dotId: string; text: string },
   digest: null, digestBusy: false, digestTried: false, digestOff: false, assetsUsage: null, diag: [],
+  // the super atom: what it knows about you, what you've read, its pings, and the You tab's edits in progress
+  memory: [] as any[], memoryLoaded: false, reads: null as any, readsLoaded: false, readsTried: false, pings: null as any, knowEdit: {} as Record<string, string>, knowOpen: {} as Record<string, boolean>, showHeld: false,
   env: { claude: false, use: false, hot: false, caps: {} } as Record<string, any>, capsLeft: 0, commentsOff: false, fresh: new Map(), seen: new Set(),
 };
 export type State = typeof init & { [k: string]: any };

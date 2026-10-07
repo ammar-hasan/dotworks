@@ -127,6 +127,8 @@ function makeRuntime(opts = {}) {
     const ctx = { signal: o.signal || new AbortController().signal };
     const isWake = typeof input === "string" && /waking for a check-in/.test(input);
     const isJobRun = typeof input === "string" && /You are running one of your jobs/.test(input);
+    const isLearn = typeof input === "string" && /How to learn:/.test(input);
+    if (isLearn) flags.learnPrompt = input;
     if (isWake) flags.lastWake = input;
     if (isWake && tools.length && opts.ask) {
       flags.askTools = tools.map(t => t.name);
@@ -139,12 +141,18 @@ function makeRuntime(opts = {}) {
       flags.r1 = await by.propose_action.execute({ kind: "action", app: "Slack", tool: "slack_send_message", input: { channel_id: "C1", message: "Launch is Tuesday 10am.", bogus: 1 }, verb: "Post", title: "Answer the launch question", why: "Two people asked" }, ctx);
       flags.r2 = await by.propose_action.execute({ kind: "action", app: "Google Calendar", tool: "update_event", input: { eventId: "e1", description: "Agenda\n1. Status\n2. Risks", notificationLevel: "NONE" }, verb: "Add agenda", title: "Add an agenda to Dashboard review", why: "It has none" }, ctx);
       flags.r3 = await by.propose_action.execute({ kind: "action", app: "Gmail", tool: "create_draft", input: { to: ["a@x.com"], body: "hi" }, title: "Email Ana", why: "x" }, ctx);
+    } else if (isLearn && tools.length) {
+      flags.learnTools = tools.map(t => t.name);
+      const act = await by.recent_activity.execute({ days: 14 }, ctx); flags.activity = act;
+      flags.suggested = await by.suggest_memory.execute({ text: "Prefers drafts to sending", kind: "preference", why: "You changed two drafts before approving them", evidence: act.asks.slice(0, 2).map(a => a.id) }, ctx);
+      flags.suggestedAgain = await by.suggest_memory.execute({ text: "Prefers drafts to sending.", why: "same" }, ctx);
     } else if (isWake && tools.length) {
+      flags.wakeTools = tools.map(t => t.name);
       if (by.calendar_events) await by.calendar_events.execute({ days: 2 }, ctx);
       if (by.gmail_search) { const th = await by.gmail_search.execute({ query: "in:inbox is:unread" }, ctx); if (th[0]) await by.gmail_read_thread.execute({ threadId: th[0].threadId }, ctx); }
-      await by.propose_action.execute({ kind: "reply", title: "Reply to Sara about the deck", why: "She asked twice", to: ["Sara <sara@x.com>"], subject: "Re: deck", body: "Hi Sara,\nLooks good.", replyToMessageId: "m1", threadId: "t1" }, ctx);
+      flags.p1 = await by.propose_action.execute({ kind: "reply", title: "Reply to Sara about the deck", why: "She asked twice", to: ["Sara <sara@x.com>"], subject: "Re: deck", body: "Hi Sara,\nLooks good.", replyToMessageId: "m1", threadId: "t1", used: ["m1", "m9"] }, ctx);
       await by.propose_action.execute({ kind: "rsvp", title: "Broken rsvp", why: "no event id", response: "accepted" }, ctx);
-      await by.propose_action.execute({ kind: "block", title: "Focus: Q4 plan", why: "Tomorrow is packed", start: iso(864e5), end: iso(864e5 + 5400e3) }, ctx);
+      flags.p3 = await by.propose_action.execute({ kind: "block", title: "Focus: Q4 plan", why: "Tomorrow is packed", start: iso(864e5), end: iso(864e5 + 5400e3), ...(opts.urgentBlock ? { urgent: true } : {}) }, ctx);
       try { await by.propose_action.execute({ kind: "note", title: "Fourth", why: "over the limit" }, ctx); flags.limited = false; } catch { flags.limited = true; }
     } else if (isJobRun && tools.length) {
       if (by.calendar_events) await by.calendar_events.execute({ days: 7 }, ctx);
@@ -152,11 +160,15 @@ function makeRuntime(opts = {}) {
       await by.propose_action.execute({ kind: "note", title: "Your week at a glance", why: "The Monday plan", draft: "Tue 6h, Wed 3h, Thu 7h" }, ctx);
     } else if (!isWake && Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "")) {
       flags.carried = (flags.carried || 0) + 1; flags.carriedWith = input[input.length - 1].content;
+    } else if (!isWake && Array.isArray(input) && tools.length && by.remember && /remember/i.test(input[input.length - 1]?.content || "")) {
+      flags.chatTools = tools.map(t => t.name);
+      flags.remembered = await by.remember.execute({ text: "Prefers short replies", kind: "preference" }, ctx);
     } else if (!isWake && Array.isArray(input) && tools.length && by.propose_action) {
+      flags.chatTools = tools.map(t => t.name);
       await by.propose_action.execute({ kind: "rsvp", title: "Accept Dashboard review", why: "Unanswered", eventId: "e1", response: "accepted" }, ctx);
     }
     if (ctx.signal.aborted) throw { code: "cancelled", message: "stopped" };
-    const text = isJobRun ? "## Wednesday is your lightest day\n- Tuesday and Thursday are over six hours of meetings\n- I asked which afternoon to keep free"
+    const text = isLearn ? "## One thing I noticed\n- Looked at what you did lately\n- Asked you about one pattern" : isJobRun ? "## Wednesday is your lightest day\n- Tuesday and Thursday are over six hours of meetings\n- I asked which afternoon to keep free"
       : isWake ? "## Two things need you today\n- Sara asked about the deck — draft ready\n- Dashboard review at 17:00 — you haven't replied\n- Read https://example.com/x for context"
       : Array.isArray(input) && /My answer to your question/.test(input[input.length - 1]?.content || "") ? "On it. I'll chase the pending ones first."
       : Array.isArray(input) ? "Sure — I'd keep the reply short. I queued the RSVP too." : "Things look calm.";
@@ -333,6 +345,8 @@ function installSpeech(w, extra) {
 }
 // a click the platform can prove: the flag is up only while the event is being dispatched
 const click = (w, el) => { if (!el) throw new Error("missing element to click"); w.__inGesture = true; try { el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true })); } finally { w.__inGesture = false; } };
+// wait for something the page does after a chain of awaits (a toast, a write), up to ms
+const waitFor = async (fn, ms = 800) => { for (let t = 0; t < ms; t += 20) { if (fn()) return true; await tick(20); } return !!fn(); };
 const q = (d, s) => d.querySelector(s);
 const qa = (d, s) => [...d.querySelectorAll(s)];
 const text = (d, s) => (q(d, s)?.textContent || "").replace(/\s+/g, " ").trim();
@@ -388,7 +402,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   const warns = [];
   const { w, d, errors } = await load(rt, { wait: 300, warns });
   ok(/Good (morning|afternoon|evening)|Still up/.test(text(d, "#greet")), "greets by time of day: " + text(d, "#greet"));
-  ok(qa(d, "#field .orb-btn").length === 2, "two seeds float in the empty field");
+  ok(qa(d, '#field .orb-btn[data-act="plant-open"]').length === 2 && qa(d, '#field .orb-btn[data-act="lead-new"]').length === 1, "two seeds float in the empty field, beside a place for your super atom");
   ok(!!q(d, '#field .av.seed[data-shape="squircle"][data-acc="glasses"]'), "seed shows its character (squircle + glasses)");
   ok(/Dashboard review|Standup/.test(text(d, "#horizon")) || /Show my day/.test(text(d, "#horizon")), "horizon present: " + text(d, ".hz-cap"));
   ok(rt.calls.mcp.some(c => c.watch && c.tool === "list_events"), "horizon uses watchTool when Calendar is granted");
@@ -1136,7 +1150,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(fil && fil.input.trigger_id === jc2.cloud.triggerId && /^Follow-up run/.test(fil.input.text) && fil.input.text.includes(jc.id) && fil.input.text.includes("run_c1"), "the last answer starts a follow-up run of that job: " + (fil?.input.text || "").slice(0, 60));
     ok(rt.db.store.get(`data/users/${UID}/${jc.id}`).filing?.runId === "run_c1", "remembered, so another tab doesn't start it twice");
     ok(!rt.calls.sample.some(c => Array.isArray(c.input) && /My answer to your question/.test(c.input[c.input.length - 1]?.content || "")), "no conversation here: the job carries on in the cloud");
-    ok(/carrying on with the 2 you said yes to/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ")), "says how many it's carrying on with");
+    ok(await waitFor(() => /carrying on with the 2 you said yes to/.test([...d.querySelectorAll(".toast")].map(t => t.textContent).join(" "))), "says how many it's carrying on with");
     ok(/All clear/.test(text(d, "#asksTitle")), "the list goes once everything is answered");
     // a run where everything was skipped starts nothing
     await rt.db.api.collection(`data/users/${UID}`).doc("act_e1").set({ type: "action", source: "cloud", dotId: kd.id, jobId: jc.id, runId: "run_c2", state: "pending", createdAt: now + 9, kind: "question", title: "Calendar invite: Q4 offsite", why: "Adds it.", question: { choices: [{ id: "yes", label: "Add it" }, { id: "no", label: "Skip" }], allowText: false, group: "Add these?" }, about: { source: "calendar" } });
@@ -1381,6 +1395,145 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     typeIn(w, d.querySelector("#reply"), "anything new?"); submit(w, d.querySelector("#composer")); await tick(300);
     ok(/That message didn't go through\. Claude didn't answer this time, a connection problem\. Try again\./.test(text(d, "#replyNote")) && d.querySelector("#reply").value === "anything new?", "it says why, and your words go back in the box");
     ok((rt.db.store.get(`data/users/${UID}/dot_h/runs/run_h1`).thread || []).length === 0, "the unanswered message isn't kept");
+  }
+  console.log("35. The super atom: one per person; it keeps what you tell it, learns from what you do, and you confirm it");
+  {
+    const rt = makeRuntime({ undo: true });
+    rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: null });
+    // two things you did lately: a draft you changed before approving it, and a note you set aside
+    rt.db.store.set(`data/users/${UID}/act_d1`, { type: "action", source: "page", dotId: "dot_m", runId: "run_x", state: "done", createdAt: Date.now() - 864e5, decidedAt: Date.now() - 80e6, kind: "reply", title: "Reply to Omar", why: "x", payload: { to: ["o@x.com"], subject: "Re", body: "Thanks!" }, result: { label: "Draft saved in Gmail", at: Date.now() - 80e6, edits: [{ field: "body", from: "Best regards", to: "Cheers" }] } });
+    rt.db.store.set(`data/users/${UID}/act_d2`, { type: "action", source: "page", dotId: "dot_m", runId: "run_x", state: "dismissed", createdAt: Date.now() - 864e5, decidedAt: Date.now() - 70e6, kind: "note", title: "Read the deck", why: "x", draft: "x" });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    const mems = () => [...rt.db.store.entries()].filter(([k, v]) => v?.type === "memory").map(([k, v]) => ({ id: k.split("/").pop(), ...v }));
+    const toasts = () => [...d.querySelectorAll(".toast")].map(t => t.textContent).join(" ");
+    // a place for it on Home, and its own form
+    const ghost = d.querySelector('#field [data-act="lead-new"]');
+    ok(!!ghost && /Your super atom/.test(ghost.textContent) && !!ghost.querySelector('.av.lead[data-orbits="three"]'), "Home offers your super atom, drawn with three orbits");
+    click(w, ghost); await tick(60);
+    ok(/Your super atom/.test(text(d, "#sh-title")) && d.querySelector("#sh-name").value === "Friday" && /looks across all your others/.test(text(d, ".lead-intro")) && qa(d, '#sh-look [data-look="orbits"]').length === 3 && !d.querySelector("#sh-ask"), "its own form: a name, what it does, and its orbits to pick");
+    click(w, d.querySelector('#sh-look [data-look="orbits"][data-v="ring"]')); await tick(20);
+    submit(w, d.querySelector("#sh-form")); await tick(300);
+    const lead = dotsIn(rt).find(x => x.role === "lead");
+    const learnJ = [...rt.db.store.entries()].find(([k, v]) => v?.type === "job" && v.learn === true);
+    const lj = learnJ && learnJ[0].split("/").pop();
+    ok(lead && lead.name === "Friday" && lead.look.orbits === "ring" && lead.sources.length >= 2, "made: the super atom, with the orbits you picked and all your apps");
+    ok(learnJ && learnJ[1].dotId === lead.id && learnJ[1].title === "Learn from what I do", "it comes with its learning job");
+    ok(d.querySelector('#dvTabs [data-tab="know"]')?.getAttribute("aria-selected") === "true" && /What I know about you/.test(text(d, "#know")) && /Nothing yet/.test(text(d, "#know")), "it opens on its You tab: nothing known yet");
+    ok(!!rt.db.store.get(`data/users/${UID}/reads`)?.since, "it starts counting which notes you've read");
+    click(w, d.querySelector('.dv-h [data-nav="home"]')); await tick(80);
+    const orbs = qa(d, "#field .orb-btn");
+    ok(orbs[0]?.dataset.id === lead.id && orbs[0].classList.contains("lead") && !d.querySelector('#field [data-act="lead-new"]') && qa(d, "#dotList .dl-i")[0]?.dataset.id === lead.id, "on Home and in the list it comes first, and there's no second one to add");
+    // tell it something on its You tab
+    click(w, orbs[0]); await tick(60);
+    click(w, d.querySelector('#dvTabs [data-tab="know"]')); await tick(30);
+    typeIn(w, d.querySelector("#knowIn"), "I don't take meetings before 10"); submit(w, d.querySelector("#knowAdd")); await tick(120);
+    ok(mems().length === 1 && mems()[0].status === "confirmed" && mems()[0].source === "you-said" && mems()[0].scope === "all" && /meetings before 10/.test(text(d, "#know")), "what you add is kept at once, for all your atoms");
+    // tell another atom in chat: it remembers too
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(60);
+    typeIn(w, d.querySelector("#reply"), "remember that I like short replies"); submit(w, d.querySelector("#composer")); await tick(400);
+    ok(rt.flags.chatTools?.includes("remember") && !rt.flags.chatTools.includes("suggest_memory") && !rt.flags.chatTools.includes("recent_activity"), "any atom can keep what you tell it; only the super atom suggests things");
+    ok(mems().some(m => m.text === "Prefers short replies" && m.status === "confirmed" && m.by === "dot_m") && /Remembered: Prefers short replies/.test(toasts()), "kept, and it says so");
+    // every atom's wake carries what you told it, and an ask says which it follows
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(700);
+    ok(/What the owner has told you about how they like things done/.test(rt.flags.lastWake || "") && /\[m1\] Prefers short replies/.test(rt.flags.lastWake || "") && /\[m2\] I don't take meetings before 10/.test(rt.flags.lastWake || ""), "the wake carries what you told your atoms, newest first, tagged");
+    ok(/may be held back/.test(rt.flags.lastWake || ""), "and knows that what it queues may be held back");
+    const sara = actsIn(rt).find(a => a.kind === "reply" && a.title === "Reply to Sara about the deck");
+    ok(sara && Array.isArray(sara.memoryUsed) && sara.memoryUsed.length === 1 && sara.memoryUsed[0].text === "Prefers short replies", "an ask says which preference it follows (only the tags it was given)");
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(60);
+    ok(/Because you told me: “Prefers short replies”/.test(text(d, "#asksList")), "and its card says so");
+    // the super atom's check-in looks across your team
+    click(w, d.querySelector(`#dotList [data-id="${lead.id}"]`)); await tick(60);
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(700);
+    ok(/super atom/.test(rt.flags.lastWake) && /Your team/.test(rt.flags.lastWake) && /Meeting prep: Look at my meetings/.test(rt.flags.lastWake) && /That's all for now/.test(rt.flags.lastWake), "the super atom's check-in looks across your team");
+    // its learning job reads only what you did, and suggests
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    ok(/reads only what you do and say in Atoms/.test(text(d, "#jobs")), "its learning job says what it reads");
+    click(w, d.querySelector(`[data-act="job-run"][data-job="${lj}"]`)); await tick(800);
+    ok((rt.flags.learnTools || []).slice().sort().join() === "recent_activity,suggest_memory", "learning reads only what you did: no app tools at all");
+    ok(rt.flags.activity?.asks.some(a => a.id === "act_d1" && a.outcome === "changed, then approved" && a.changed[0].to === "Cheers") && rt.flags.activity.asks.some(a => a.id === "act_d2" && a.outcome === "set aside"), "it sees what you changed before approving, and what you set aside");
+    ok(rt.flags.activity?.messages.some(m => /short replies/.test(m.text)) && rt.flags.activity.known.includes("Prefers short replies"), "and your own words in chat, and what it already knows");
+    const cand = mems().find(m => m.status === "candidate"), q = cand && actsIn(rt).find(a => a.memoryId === cand.id);
+    ok(cand && cand.text === "Prefers drafts to sending" && cand.source === "you-did" && cand.evidence.length === 2 && q && q.kind === "question" && /^Is this right\?/.test(q.title) && q.jobId === lj, "a suggestion waits for your yes, as a question, with what it's based on");
+    ok(/Already known/.test(rt.flags.suggestedAgain || "") && mems().filter(m => /drafts to sending/.test(m.text)).length === 1, "the same thing isn't suggested twice");
+    click(w, d.querySelector('#dvTabs [data-tab="know"]')); await tick(40);
+    ok(/Is this right\? · 1/.test(text(d, "#know")) && /You changed two drafts/.test(text(d, "#know .know-sug")) && /\b1\b/.test(text(d, '#dvTabs [data-tab="know"] .count')), "the You tab shows the suggestion and why, and its tab counts it");
+    const carried = rt.flags.carried || 0, fired = rt.calls.mcp.filter(c => c.tool === "fire_trigger").length;
+    click(w, d.querySelector(`#know [data-act="mem-answer"][data-id="${cand.id}"][data-choice="keep"]`)); await tick(200);
+    const qa1 = actsIn(rt).find(a => a.id === q.id);
+    ok(rt.db.store.get(`data/users/${UID}/${cand.id}`).status === "confirmed" && qa1.state === "done" && !!qa1.continuedAt && (rt.flags.carried || 0) === carried && rt.calls.mcp.filter(c => c.tool === "fire_trigger").length === fired, "Yes keeps it, and nothing else runs");
+    // pin, edit and forget
+    const kept = mems().find(m => m.text === "Prefers drafts to sending");
+    click(w, d.querySelector(`#know [data-act="mem-pin"][data-id="${kept.id}"]`)); await tick(80);
+    ok(rt.db.store.get(`data/users/${UID}/${kept.id}`).pinned === true && /pinned/.test(text(d, `#know [data-key="${kept.id}"] small`)), "Pin");
+    click(w, d.querySelector(`#know [data-act="mem-edit"][data-id="${kept.id}"]`)); await tick(40);
+    typeIn(w, d.querySelector(`#know textarea[data-memedit="${kept.id}"]`), "Prefers drafts to sending, always");
+    click(w, d.querySelector(`#know [data-act="mem-save"][data-id="${kept.id}"]`)); await tick(80);
+    ok(rt.db.store.get(`data/users/${UID}/${kept.id}`).text === "Prefers drafts to sending, always" && !d.querySelector(`#know textarea[data-memedit="${kept.id}"]`) && /drafts to sending, always/.test(text(d, "#know")), "Edit, and Save puts it back the way it reads");
+    const short = mems().find(m => m.text === "Prefers short replies");
+    click(w, d.querySelector(`#know [data-act="mem-forget"][data-id="${short.id}"]`)); await tick(40);
+    ok(/Forget this\? It's deleted for good/.test(text(d, "#know")), "Forget asks first");
+    click(w, d.querySelector(`#know [data-act="mem-forget-yes"][data-id="${short.id}"]`)); await tick(150);
+    ok(!rt.db.store.has(`data/users/${UID}/${short.id}`) && (actsIn(rt).find(a => a.title === "Reply to Sara about the deck").memoryUsed || []).length === 0, "Forget deletes it, and the ask that quoted it no longer does");
+    click(w, d.querySelector(`#know [data-act="mem-forget"][data-id="${kept.id}"]`)); await tick(40);
+    click(w, d.querySelector(`#know [data-act="mem-forget-yes"][data-id="${kept.id}"]`)); await tick(150);
+    ok(!rt.db.store.has(`data/users/${UID}/${kept.id}`) && !actsIn(rt).some(a => a.memoryId === kept.id), "forgetting what it learned deletes its question too");
+    // deleting the super atom takes what it knew with it
+    click(w, d.querySelector('[data-act="delete-dot"]')); await tick(30);
+    ok(/everything it knows about you/.test(text(d, "#dvConfirm")), "deleting it says it forgets what it knew");
+    click(w, d.querySelector('[data-act="confirm-del"]')); await tick(400);
+    ok(!dotsIn(rt).some(x => x.role === "lead") && mems().length === 0, "deleted, and what it knew is gone");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
+  console.log("36. Your attention: what can wait is held back, and pings keep to your budget");
+  {
+    const rt = makeRuntime({ urgentBlock: true });
+    const now = new Date(), today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    rt.db.store.set(`data/users/${UID}/dot_l`, { type: "dot", role: "lead", name: "Friday", responsibility: "Brief me.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 42, look: { shape: "orb", eyes: "wide", acc: "none", orbits: "three" }, attention: { open: 2, quietFrom: 0, quietTo: 0 }, createdAt: 1, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/dot_m`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar", "gmail"], cadence: "daily", tier: "default", hue: 214, createdAt: 2, lastRunAt: null });
+    // two things already wait for you, and four pings went out today
+    rt.db.store.set(`data/users/${UID}/act_w1`, { type: "action", source: "page", dotId: "dot_m", runId: "r0", state: "pending", createdAt: Date.now() - 5e5, kind: "note", title: "Old note one", why: "x", draft: "a" });
+    rt.db.store.set(`data/users/${UID}/act_w2`, { type: "action", source: "page", dotId: "dot_m", runId: "r0", state: "pending", createdAt: Date.now() - 4e5, kind: "note", title: "Old note two", why: "x", draft: "b" });
+    rt.db.store.set(`data/users/${UID}/pings`, { day: today, count: 4, lastAt: Date.now() - 3600e3, recent: [] });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(60);
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(700);
+    const made = actsIn(rt).filter(a => a.dotId === "dot_m" && a.runId !== "r0");
+    ok(made.length === 3 && made.filter(a => a.state === "held").length === 2 && made.find(a => a.kind === "block")?.state === "pending" && made.find(a => a.kind === "block").urgent === true, "with 2 already waiting, what can wait is held back; the urgent one still comes through");
+    ok(/held back/i.test(rt.flags.p1 || "") && /Holding back for later/.test(text(d, "#msgs")), "the atom is told, and its steps say so");
+    click(w, d.querySelector('#nav [data-nav="asks"]')); await tick(60);
+    ok(/2 more asks are held back until you clear some/.test(text(d, "#asksList")) && !/Reply to Sara/.test(text(d, "#asksList")) && /Focus: Q4 plan/.test(text(d, "#asksList")) && /today/.test(text(d, "#asksList")), "Asks says how many are held back, shows the urgent one, marked for today");
+    click(w, d.querySelector('[data-act="held-toggle"]')); await tick(40);
+    ok(/Reply to Sara about the deck/.test(text(d, "#asksList")) && /held back/.test(text(d, "#asksList")), "Show them shows them, marked held back");
+    click(w, d.querySelector('[data-act="dismiss"][data-id="act_w1"]')); await tick(150);
+    ok(actsIn(rt).filter(a => a.state === "held").length === 2, "one cleared: still at your limit, nothing comes back yet");
+    click(w, d.querySelector('[data-act="dismiss"][data-id="act_w2"]')); await tick(250);
+    const back = actsIn(rt).find(a => a.title === "Reply to Sara about the deck");
+    ok(back.state === "pending" && !!back.releasedAt && actsIn(rt).filter(a => a.state === "held").length === 1, "you cleared some: the oldest held one comes back");
+    ok(!/Three|Broken rsvp/.test(text(d, "#handled")), "held asks never show as handled");
+    click(w, d.querySelector('[data-act="clear-done"]')); await tick(150);
+    ok(actsIn(rt).filter(a => a.state === "held").length === 1 && !actsIn(rt).some(a => a.id === "act_w1"), "Clear handled clears what you handled, never what's held back");
+    // your budget, on the super atom's You tab
+    click(w, d.querySelector('#dotList [data-id="dot_l"]')); await tick(60);
+    click(w, d.querySelector('#dvTabs [data-tab="know"]')); await tick(40);
+    ok(/Pings and your attention/.test(text(d, "#know")) && /Pings wait: 4 pings today already/.test(text(d, "#know")) && /1 held back/.test(text(d, "#know")), "the You tab shows your budget, what's held, and why pings wait now");
+    const sel = d.querySelector('#know select[data-att="open"]'); sel.value = "4"; sel.dispatchEvent(new w.Event("change", { bubbles: true })); await tick(250);
+    ok(rt.db.store.get(`data/users/${UID}/dot_l`).attention.open === 4 && actsIn(rt).filter(a => a.state === "held").length === 0, "raise the limit: it's saved, and what fits comes back");
+    // the super atom pings every 3 hours by default; with it here, other atoms' schedules stay quiet
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    ok(/pings your phone only when something is worth it/.test(text(d, "#cloud")), "keeping it awake says what pings are");
+    click(w, d.querySelector('#cloud [data-act="cloud-open"]')); await tick(20);
+    ok(d.querySelector('#cloud select[data-cloud="when"]').value === "every3" && d.querySelector('#cloud input[data-cloud="push"]').checked && /within my budget/.test(text(d, "#cloud")), "the super atom checks in every 3 hours and may ping your phone, within your budget");
+    click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(60);
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
+    click(w, d.querySelector('#cloud [data-act="cloud-open"]')); await tick(20);
+    ok(!d.querySelector('#cloud input[data-cloud="push"]').checked && /Friday tells you when this matters/.test(text(d, "#cloud")), "another atom's schedule stays quiet: Friday pings for it");
+    click(w, d.querySelector('[data-act="cloud-create"]')); await tick(150);
+    const ct = rt.calls.mcp.filter(c => c.tool === "create_trigger").pop();
+    ok(ct && ct.input.notifications && ct.input.notifications.push === false, "and its schedule is made without phone pings");
+    // what you've read: opening its chat after it wrote marks it
+    click(w, d.querySelector('#dvTabs [data-tab="chat"]')); await tick(1100);
+    ok((rt.db.store.get(`data/users/${UID}/reads`)?.at || {}).dot_m > 0, "opening an atom's chat marks its notes read");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");
   {
