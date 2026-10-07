@@ -202,7 +202,9 @@ export async function cloudCreate(s: Sub) {
     if (!id) throw { code: "no_id", message: "The schedule was created but no id came back." };
     const mode = t?.derived_state?.permission_mode;
     const cloud: Record<string, any> = { triggerId: id, cron: plan.cron, tz: TZ, say: plan.say, since: Date.now(), auto: t?.derived_state ? mode === "auto" : null, push: plan.push };
-    if (Array.isArray(t?.mcp_connections)) { const got = t.mcp_connections.map(c => appKey(c?.name)); cloud.missing = wantApps(d).filter(n => !got.includes(appKey(n))); }
+    // the super atom's learning job needs none of your apps, so nothing is missing for it
+    if (s.j?.learn) cloud.missing = [];
+    else if (Array.isArray(t?.mcp_connections)) { const got = t.mcp_connections.map(c => appKey(c?.name)); cloud.missing = wantApps(d).filter(n => !got.includes(appKey(n))); }
     S.cloudStep[s.id] = "Linking it to " + (s.j ? jobTitle(s.j) : d.name) + "…"; paintCloud();
     await saveRec(s, { cloud, cloudPending: null });
     S.cloudOpen[s.id] = false;

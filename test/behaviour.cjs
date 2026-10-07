@@ -1448,6 +1448,12 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // its learning job reads only what you did, and suggests
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
     ok(/reads only what you do and say in Atoms/.test(text(d, "#jobs")), "its learning job says what it reads");
+    // scheduling it: it needs none of your apps, and it doesn't ping your phone
+    click(w, d.querySelector(`[data-act="cloud-open"][data-job="${lj}"]`)); await tick(30);
+    ok(!d.querySelector(`#cloud-${lj} input[data-cloud="push"]`).checked && /needs none of your apps/.test(text(d, `#cloud-${lj}`)), "scheduling its learning job: no phone pings, and it needs none of your apps");
+    click(w, d.querySelector(`[data-act="cloud-create"][data-job="${lj}"]`)); await tick(200);
+    const lct = rt.calls.mcp.filter(c => c.tool === "create_trigger").pop();
+    ok(lct && lct.input.notifications?.push === false && /Every day at 20:/.test(lct.input.cron_expression ? rt.db.store.get(`data/users/${UID}/${lj}`).cloud.say : "") && (rt.db.store.get(`data/users/${UID}/${lj}`).cloud.missing || []).length === 0 && !/one step left/.test(toasts()), "scheduled for the evening, with nothing missing and no step left to do");
     click(w, d.querySelector(`[data-act="job-run"][data-job="${lj}"]`)); await tick(800);
     ok((rt.flags.learnTools || []).slice().sort().join() === "recent_activity,suggest_memory", "learning reads only what you did: no app tools at all");
     ok(rt.flags.activity?.asks.some(a => a.id === "act_d1" && a.outcome === "changed, then approved" && a.changed[0].to === "Cheers") && rt.flags.activity.asks.some(a => a.id === "act_d2" && a.outcome === "set aside"), "it sees what you changed before approving, and what you set aside");
