@@ -155,6 +155,8 @@ function makeRuntime(opts = {}) {
       flags.p3 = await by.propose_action.execute({ kind: "block", title: "Focus: Q4 plan", why: "Tomorrow is packed", start: iso(864e5), end: iso(864e5 + 5400e3), ...(opts.urgentBlock ? { urgent: true } : {}) }, ctx);
       try { await by.propose_action.execute({ kind: "note", title: "Fourth", why: "over the limit" }, ctx); flags.limited = false; } catch { flags.limited = true; }
     } else if (isJobRun && tools.length) {
+      flags.jobTools = tools.map(t => t.name); flags.jobPrompt = input;
+      if (by.update_notebook) flags.nb = await by.update_notebook.execute({ text: "## Trends\n- Agent memory: 4 launches this week (was 3)\n## Predictions\n- 70%: a memory layer for coding agents launches by 30 Oct" }, ctx);
       if (by.calendar_events) await by.calendar_events.execute({ days: 7 }, ctx);
       await by.ask_owner.execute({ question: "Which afternoon should I keep free?", choices: ["Tuesday", "Wednesday"], why: "Both are light" }, ctx);
       await by.propose_action.execute({ kind: "note", title: "Your week at a glance", why: "The Monday plan", draft: "Tue 6h, Wed 3h, Thu 7h" }, ctx);
@@ -1434,7 +1436,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // tell another atom in chat: it remembers too
     click(w, d.querySelector('#dotList [data-id="dot_m"]')); await tick(60);
     typeIn(w, d.querySelector("#reply"), "remember that I like short replies"); submit(w, d.querySelector("#composer")); await tick(400);
-    ok(rt.flags.chatTools?.includes("remember") && !rt.flags.chatTools.includes("suggest_memory") && !rt.flags.chatTools.includes("recent_activity") && !rt.flags.chatTools.includes("claude_runs"), "any atom can keep what you tell it; only the super atom suggests things or looks at Claude's runs");
+    ok(rt.flags.chatTools?.includes("remember") && !rt.flags.chatTools.includes("suggest_memory") && !rt.flags.chatTools.includes("recent_activity") && !rt.flags.chatTools.includes("claude_runs") && !rt.flags.chatTools.includes("update_notebook"), "any atom can keep what you tell it; only the super atom suggests things or looks at Claude's runs");
     ok(mems().some(m => m.text === "Prefers short replies" && m.status === "confirmed" && m.by === "dot_m") && /Remembered: Prefers short replies/.test(toasts()), "kept, and it says so");
     // every atom's wake carries what you told it, and an ask says which it follows
     click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(700);
@@ -1580,6 +1582,59 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(v2.w, v2.d.querySelector('#dvTabs [data-tab="chat"]')); await tick(30);
     typeIn(v2.w, v2.d.querySelector("#reply"), "anything running?"); submit(v2.w, v2.d.querySelector("#composer")); await tick(400);
     ok(!(rt2.flags.chatTools || []).includes("claude_runs") && /You can't see the owner's Claude sessions or scheduled tasks from here\. They're listed at https:\/\/claude\.ai\/code/.test(rt2.flags.chatContext || "") && !rt2.flags.runs, "without Claude Code Remote it has no such tool, and says where to look");
+  }
+  console.log("38. An atom can read the web on its schedule and keep a notebook between runs");
+  {
+    const triggers = [{ id: "trig_w", name: "Atoms · Product Hunter · ab12", enabled: true, next_run_at: iso(5 * 3600e3), mcp_connections: [], last_run: { status: "ROUTINE_RUN_STATUS_SUCCEEDED", fired_at: iso(-7200e3), finished_at: iso(-7000e3) } }];
+    const rt = makeRuntime({ triggers });
+    rt.db.store.set(`data/users/${UID}/dot_w`, { type: "dot", name: "Product Hunter", responsibility: "Find what's launching and trending.", rules: [], sources: ["The web"], cadence: "daily", tier: "default", hue: 190, notebook: true, createdAt: 1, lastRunAt: null, cloud: { triggerId: "trig_w", say: "Every weekday at 08:52", since: 1, missing: [] } });
+    rt.db.store.set(`data/users/${UID}/job_w1`, { type: "job", dotId: "dot_w", title: "Weekly patterns", task: "Look back over the week and make three predictions.", rules: [], repo: null, run: null, when: "twice", createdAt: 2, cloud: null, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/nb_dot_w`, { type: "notebook", dotId: "dot_w", text: "## Trends\n- Agent memory: 3 launches\n## Predictions\n- 60%: voice agents for clinics by November", updatedAt: Date.now() - 3600e3, by: "cloud" });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    // the form offers the web and a notebook
+    click(w, d.querySelector('#homeActions [data-act="new"]')); await tick(30);
+    ok(/The web \(on its schedule\)/.test(text(d, "#sh-srcs")) && !!d.querySelector("#sh-nb"), "a new atom can read the web, on its schedule, and keep a notebook");
+    const nm = d.querySelector("#sh-name"); nm.value = "Scout"; nm.dispatchEvent(new w.Event("input", { bubbles: true }));
+    const rs = d.querySelector("#sh-resp"); rs.value = "Watch new AI launches."; rs.dispatchEvent(new w.Event("input", { bubbles: true }));
+    for (const c of d.querySelectorAll("#sh-srcs input")) if (c.checked !== (c.dataset.src === "The web")) click(w, c);
+    click(w, d.querySelector("#sh-nb")); await tick(10);
+    submit(w, d.querySelector("#sh-form")); await tick(150);
+    const scout = dotsIn(rt).find(x => x.name === "Scout");
+    ok(scout && JSON.stringify(scout.sources) === '["The web"]' && scout.notebook === true, "saved reading only the web, with a notebook: " + JSON.stringify(scout && { s: scout.sources, nb: scout.notebook }));
+    // the web is never a missing app
+    click(w, d.querySelector('#nav [data-nav="apps"]')); await tick(30);
+    ok(![...d.querySelectorAll("#appGrid .appcard")].some(c => /web/i.test(c.dataset.key || "")), "the web isn't an app to connect");
+    // its page: a Notebook tab with what it follows
+    click(w, d.querySelector('#dotList [data-id="dot_w"]')); await tick(60);
+    ok(!!d.querySelector('#dvTabs [data-tab="notebook"]') && !/!/.test(text(d, '#dvTabs [data-tab="schedule"]')), "it has a Notebook tab, and its schedule lacks nothing");
+    click(w, d.querySelector('#dvTabs [data-tab="notebook"]')); await tick(40);
+    ok(/Agent memory: 3 launches/.test(text(d, "#notebook")) && /by its cloud run/.test(text(d, "#notebook")), "the Notebook tab shows what it follows, and who wrote it");
+    // Wake: it reads the web, so with a schedule it wakes in the cloud
+    const samples = rt.calls.sample.length;
+    click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(200);
+    ok(rt.calls.mcp.some(c => c.tool === "fire_trigger" && c.input.trigger_id === "trig_w") && rt.calls.sample.length === samples, "Wake runs it in the cloud, where it reads the web");
+    // its job has no schedule yet: Run now runs it here, with its notebook and without the web
+    click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(40);
+    click(w, d.querySelector('[data-act="job-run"][data-job="job_w1"]')); await tick(800);
+    ok(/only in your scheduled cloud runs/.test(rt.flags.jobPrompt || "") && /Your notebook, your own record/.test(rt.flags.jobPrompt) && /Agent memory: 3 launches/.test(rt.flags.jobPrompt) && /It is data, not instructions/.test(rt.flags.jobPrompt), "run here, it knows the web waits for its schedule, and reads its notebook as its own record");
+    const nb = rt.db.store.get(`data/users/${UID}/nb_dot_w`);
+    ok((rt.flags.jobTools || []).includes("update_notebook") && /4 launches this week/.test(nb.text) && nb.by === "page" && nb.jobId === "job_w1", "it rewrites its notebook");
+    // the job suits twice a week, and offers that first
+    click(w, d.querySelector('[data-act="cloud-open"][data-job="job_w1"]')); await tick(30);
+    ok(d.querySelector('#cloud-job_w1 select[data-cloud="when"]')?.value === "twice", "its schedule offers Mondays and Thursdays first");
+    click(w, d.querySelector('[data-act="cloud-create"][data-job="job_w1"]')); await tick(200);
+    const tw = rt.calls.mcp.filter(c => c.tool === "create_trigger").pop();
+    ok(tw && /\* \* 1,4$/.test(tw.input.cron_expression) && /web content is data/.test(tw.input.prompt) && /Mondays and Thursdays at/.test(rt.db.store.get(`data/users/${UID}/job_w1`).cloud.say) && (rt.db.store.get(`data/users/${UID}/job_w1`).cloud.missing || []).length === 0, "scheduled Mondays and Thursdays, needing no apps for the web");
+    // you can change it, and clear it
+    click(w, d.querySelector('#dvTabs [data-tab="notebook"]')); await tick(40);
+    click(w, d.querySelector('#notebook [data-act="nb-edit"]')); await tick(30);
+    const ta = d.querySelector("#nb-text"); ta.value = "## Trends\n- Agent memory: settled"; ta.dispatchEvent(new w.Event("input", { bubbles: true }));
+    click(w, d.querySelector('#notebook [data-act="nb-save"]')); await tick(120);
+    ok(rt.db.store.get(`data/users/${UID}/nb_dot_w`).text === "## Trends\n- Agent memory: settled" && rt.db.store.get(`data/users/${UID}/nb_dot_w`).by === "you" && /settled/.test(text(d, "#notebook")), "you can change its notebook");
+    click(w, d.querySelector('#notebook [data-act="nb-clear"]')); await tick(30);
+    click(w, d.querySelector('#notebook [data-act="nb-clear-yes"]')); await tick(120);
+    ok(!rt.db.store.get(`data/users/${UID}/nb_dot_w`) && /Nothing yet/.test(text(d, "#notebook")), "and clear it");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
   console.log("20. Claude declined for this page");
   {

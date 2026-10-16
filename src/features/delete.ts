@@ -5,6 +5,7 @@ import { NS, S, cloudOn, jobsOf, runsCol, userDoc } from "../core/state";
 import { go } from "../ui/nav";
 import { isLead } from "../ui/characters";
 import { forgetAll } from "./memory";
+import { nbId } from "./notebook";
 import { renderAll } from "../ui/shell";
 
 /* ═════════ delete ═════════ */
@@ -38,6 +39,7 @@ export async function deleteDot(did) {
   (async () => {
     try { const snap = await runsCol(did).get(); for (const x of snap.docs) await runsCol(did).doc(x.id).delete(); } catch (e) { diag("db.delete.runs", e); }
     for (const id of asks) await userDoc(id).delete().catch(() => {});
+    if (S.notebooks[did] || d.notebook) { await userDoc(nbId(did)).delete().catch(() => {}); const { [did]: _, ...rest } = S.notebooks; S.notebooks = rest; }
     for (const j of jobs) await userDoc(j.id).delete().catch(() => {});
     if (d.notesAssetId) NS.assets?.delete(d.notesAssetId).catch(() => {});
     // your super atom takes what it knew about you with it

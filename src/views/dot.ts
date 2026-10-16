@@ -4,7 +4,7 @@ import { ICON, SAMPLE_WHY, TIERS } from "../core/constants";
 import { $, ago, dayLabel, esc, fmtTime, fmtWhen, handleOf, headlineOf, hueOf, md, plural, reconcile } from "../core/helpers";
 import { NS, S, awake, cloudOn, curDot, jobDriven, isNarrow, jobsOf, pending, sendOK } from "../core/state";
 import { askHtml, askSig } from "../features/asks";
-import { decisionsHtml, decisionsSig, groupKey, groupOf, isDecision, jobTitle } from "../features/jobs";
+import { cloudFirst, decisionsHtml, decisionsSig, groupKey, groupOf, isDecision, jobTitle } from "../features/jobs";
 import { receiptHtml } from "../features/receipts";
 import { canListen, canSpeak } from "../features/voice";
 import { appsMissingFor, cloudFiringFor, paintCloud } from "../features/cloud";
@@ -12,6 +12,7 @@ import { avatarHtml, isLead, lookOf, stateOf } from "../ui/characters";
 import { markRead } from "../features/attention";
 import { candidateMem } from "../features/memory";
 import { paintKnow } from "./know";
+import { keepsNotebook, paintNotebook } from "../features/notebook";
 import { dotStatus } from "../ui/shell";
 import { builderHtml, draftFromDot, paintPeoplePicker } from "./builder";
 
@@ -30,7 +31,7 @@ export function paintDot() {
   if ($("#dvMeta").innerHTML !== meta) $("#dvMeta").innerHTML = meta;
   // an atom driven by jobs runs them in the cloud; the others wake here with Claude
   const canRun = jobbed ? !!NS.mcp : !!NS.sample && !S.running && (S.perms as any).sample !== "denied";
-  const runTitle = jobbed ? "Run its jobs now, in the cloud (W)" : NS.sample ? "Wake it now for its main job (W)" : "Waking needs Claude in this view";
+  const runTitle = jobbed ? "Run its jobs now, in the cloud (W)" : cloudFirst(d) ? "Wake it now in the cloud, where it reads the web (W)" : NS.sample ? "Wake it now for its main job (W)" : "Waking needs Claude in this view";
   const act = `${live ? `<button class="btn" data-act="stop" aria-label="Stop">${ICON.stop}<span class="lbl">Stop</span></button>` : `<button class="btn pri" data-act="run" aria-label="${jobbed ? "Run now" : "Wake"}" ${canRun ? "" : "disabled"} title="${runTitle}">${ICON.bolt}<span class="lbl">${jobbed ? "Run now" : "Wake"}</span></button>`}
     <details class="menu" id="dvMenu"><summary class="icon-btn" aria-label="More">${ICON.more}</summary><div class="menu-list">
       ${NS.db && S.canShare !== false ? `<button data-act="share">Share as an element</button>` : ""}
@@ -46,12 +47,16 @@ export function paintDot() {
   // the super atom has one more tab: what it knows about you, and your attention budget
   const lead = isLead(d), cands = lead ? candidateMem().length : 0;
   if (!lead && S.tab === "know") S.tab = "chat";
-  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ...(lead ? [["know", "You", cands ? `<span class="count" title="Waiting for your yes">${cands}</span>` : ""]] : []), ["activity", "Activity", ""], ["schedule", "Jobs", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
+  // an atom that keeps a notebook shows it on its own tab
+  const nb = keepsNotebook(d);
+  if (!nb && S.tab === "notebook") S.tab = "chat";
+  const tabs = [["chat", "Chat", asks ? `<span class="count">${asks}</span>` : ""], ...(lead ? [["know", "You", cands ? `<span class="count" title="Waiting for your yes">${cands}</span>` : ""]] : []), ...(nb ? [["notebook", "Notebook", ""]] : []), ["activity", "Activity", ""], ["schedule", "Jobs", cloud ? (appsMissingFor(d) ? '<span class="count" title="Apps not attached">!</span>' : '<span class="cloud-tag">●</span>') : ""], ["settings", "Settings", ""]];
   const th = tabs.map(([k, l, extra]) => `<button role="tab" id="tab-${k}" data-tab="${k}" aria-controls="tp-${k}" aria-selected="${S.tab === k}" tabindex="${S.tab === k ? 0 : -1}">${l}${extra}</button>`).join("");
   if ($("#dvTabs").innerHTML !== th) $("#dvTabs").innerHTML = th;
-  for (const k of ["chat", "know", "activity", "schedule", "settings"]) $("#tp-" + k).hidden = S.tab !== k;
+  for (const k of ["chat", "know", "notebook", "activity", "schedule", "settings"]) $("#tp-" + k).hidden = S.tab !== k;
   if (S.tab === "chat") { paintChat(); paintComposer(); if (S.runsLoaded) markRead(d); }
   else if (S.tab === "know") paintKnow();
+  else if (S.tab === "notebook") paintNotebook();
   else if (S.tab === "activity") paintActivity();
   else if (S.tab === "schedule") paintCloud();
   else paintSettings();

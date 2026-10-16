@@ -11,7 +11,7 @@ import { answerQuestion, execute, setActionState, undoAction } from "../features
 import { deliver, newDotFrom, paintTell, tellDots } from "../features/tell";
 import { cancelAutoSend, dictationPaused, listen, setVoiceMode, speak, stopListening, stopSpeaking } from "../features/voice";
 import { cloudAct, cloudCreate, cloudFind, cloudPlan, loadTriggers, paintCloud, subOf } from "../features/cloud";
-import { curJob, jobDraft, jobRepoList, removeJob, runJob, runJobs, runMain, saveJob, saveNewJob, setCheckins } from "../features/jobs";
+import { cloudFirst, curJob, jobDraft, jobRepoList, removeJob, runJob, runJobs, runMain, saveJob, saveNewJob, setCheckins } from "../features/jobs";
 import { deleteDot } from "../features/delete";
 import { leadOf, saveAttention } from "../features/attention";
 import { applyMemoryAnswer, clearRejected, forget, memAdd, memText, memUpdate } from "../features/memory";
@@ -23,6 +23,7 @@ import { renderAll } from "./shell";
 import { paintApps, toggleApp } from "../views/apps";
 import { closeSheet, draftOf, draftWithClaude, openLead, openNew, paintPeoplePicker, paintRepoField, prefixOf, refreshLook, repoListHtml, saveBuilder, searchPeople } from "../views/builder";
 import { paintKnow } from "../views/know";
+import { clearNotebook, editNotebook, paintNotebook, saveNotebookEdit } from "../features/notebook";
 import { paintComposer } from "../views/dot";
 import { renderField } from "../views/home";
 import { renderHorizon, startDay, watchDay } from "../views/horizon";
@@ -60,7 +61,7 @@ document.addEventListener("click", ev => {
     case "repos-toggle": S.reposOpen = !S.reposOpen; if (S.reposOpen) loadRepos(); paintApps(); break;
     case "pick-person": { const mode = b.dataset.mode, f = draftOf(mode); if (f) { f.vips = [...new Set([...(f.vips || []), id])].slice(0, 5); const p = prefixOf(mode); $(`#${p}-people`).value = ""; $(`#${p}-plist`).hidden = true; paintPeoplePicker(mode); $(`#${p}-people`).focus(); } break; }
     case "unpick-person": { const mode = b.dataset.mode, f = draftOf(mode); if (f) { f.vips = (f.vips || []).filter(x => x !== id); paintPeoplePicker(mode); } break; }
-    case "run": if (d) { if (jobDriven(d)) runJobs(d); else runDot(d.id); } break;
+    case "run": if (d) { if (jobDriven(d)) runJobs(d); else if (cloudFirst(d)) runMain(d); else runDot(d.id); } break;
     case "stop": S.running?.ctl.abort(); break;
     case "run-due": runDue(); break;
     case "suggest": sendReply(id); break;
@@ -167,6 +168,13 @@ document.addEventListener("click", ev => {
     case "mem-save": { const t = memText(S.knowEdit[id]); if (t.length < 6) { toast("Say it in a sentence."); break; } delete S.knowEdit[id]; (document.activeElement as any)?.blur?.(); memUpdate(id, { text: t, editedAt: Date.now() }, "Saved"); paintKnow(true); break; }
     case "mem-forget": S.knowOpen["rm:" + id] = true; paintKnow(true); break;
     case "mem-forget-no": delete S.knowOpen["rm:" + id]; paintKnow(true); break;
+    // an atom's notebook (features/notebook.ts)
+    case "nb-edit": editNotebook(true); break;
+    case "nb-cancel": editNotebook(false); break;
+    case "nb-save": saveNotebookEdit(); break;
+    case "nb-clear": if (d) { S.nbClear = { ...S.nbClear, [d.id]: true }; paintNotebook(); } break;
+    case "nb-clear-no": if (d) { S.nbClear = { ...S.nbClear, [d.id]: false }; paintNotebook(); } break;
+    case "nb-clear-yes": if (d) clearNotebook(d); break;
     case "mem-forget-yes": delete S.knowOpen["rm:" + id]; forget(id); break;
     case "mem-clear-no": clearRejected(); break;
   }
@@ -184,7 +192,7 @@ document.addEventListener("input", ev => {
     const k = (t as any).dataset.f;
     if (k === "src") f.sources = [...document.querySelectorAll(`#${prefixOf(mode)}-srcs input[data-src]`)].filter(x => (x as any).checked).map(x => (x as any).dataset.src);
     else if (k === "hue") { f.hue = Number((t as any).value); (t as any).closest(".builder").querySelectorAll(".b-look .av").forEach(av => av.style.setProperty("--h", (t as any).value)); }
-    else f[k] = (t as any).value;
+    else f[k] = (t as any).type === "checkbox" ? (t as any).checked : (t as any).value;
     if (k === "name") { const h = $(`#${prefixOf(mode)}-handle`); if (h) h.textContent = handleOf(f); }
   }
   if ((t as any).dataset?.edit && S.edits[(t as any).dataset.id]) S.edits[(t as any).dataset.id][(t as any).dataset.edit] = (t as any).type === "checkbox" ? (t as any).checked : (t as any).value;
@@ -194,6 +202,7 @@ document.addEventListener("input", ev => {
   if ((t as any).dataset?.jobf) { const d = curDot(), k = (t as any).dataset.jobf; if (d && ["run", "task", "title"].includes(k)) { jobDraft(d)[k] = (t as any).value; if (k === "run") { const l = $("#jb-rlist"); if (l) l.innerHTML = jobRepoList(d); } } }
   if ((t as any).dataset?.jobrules) S.edits["job:" + (t as any).dataset.jobrules] = (t as any).value;
   if ((t as any).dataset?.jobtask) S.edits["jobtask:" + (t as any).dataset.jobtask] = (t as any).value;
+  if ((t as any).dataset?.nbedit && (t as any).dataset.nbedit in S.nbEdit) S.nbEdit[(t as any).dataset.nbedit] = (t as any).value;
   if ((t as any).dataset?.memedit && (t as any).dataset.memedit in S.knowEdit) S.knowEdit[(t as any).dataset.memedit] = (t as any).value;
   if ((t as any).id === "reply") { autosize(t); dictationPaused(() => { S.handsFree = false; sendReply(); }); }
 });
@@ -203,6 +212,7 @@ document.addEventListener("change", ev => {
   if ((t as any).id === "replyImg") { const file = (t as any).files?.[0]; if (file) { S.replyImage = file; paintComposer(); } (t as any).value = ""; }
   if ((t as any).dataset?.f === "src" && f) f.sources = [...document.querySelectorAll(`#${prefixOf(mode)}-srcs input[data-src]`)].filter(x => (x as any).checked).map(x => (x as any).dataset.src);
   if ((t as any).dataset?.f && (t as any).tagName === "SELECT" && f) f[(t as any).dataset.f] = (t as any).value;
+  if ((t as any).dataset?.f === "notebook" && f) f.notebook = !!(t as any).checked;
   if ((t as any).dataset?.att) saveAttention((t as any).dataset.att, (t as any).value);
   if ((t as any).dataset?.memprivate) memUpdate((t as any).dataset.memprivate, { private: !!(t as any).checked });
   if ((t as any).dataset?.cloud) {
@@ -236,7 +246,7 @@ document.addEventListener("keydown", ev => {
   }
   if (typing || ev.metaKey || ev.ctrlKey || ev.altKey || S.sheet) return;
   if (ev.key === "n" || ev.key === "N") { if (S.uid) { ev.preventDefault(); openNew(null); } }
-  else if ((ev.key === "w" || ev.key === "W") && S.view === "dot") { ev.preventDefault(); const d = curDot(); if (d && jobDriven(d)) runJobs(d); else runDot(S.selected); }
+  else if ((ev.key === "w" || ev.key === "W") && S.view === "dot") { ev.preventDefault(); const d = curDot(); if (d && jobDriven(d)) runJobs(d); else if (d && cloudFirst(d)) runMain(d); else runDot(S.selected); }
   else if (ev.key === "]") { if (S.dots.length) { ev.preventDefault(); cycle(1); } }
   else if (ev.key === "[") { if (S.dots.length) { ev.preventDefault(); cycle(-1); } }
   else if (ev.key === "/" && S.view === "dot") { ev.preventDefault(); if (S.tab !== "chat") { S.tab = "chat"; renderAll(); } $("#reply")?.focus(); }

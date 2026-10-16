@@ -1,3 +1,4 @@
+import { readsWeb } from "../core/apps";
 import { ICON } from "../core/constants";
 import { diag } from "../core/diag";
 import { $, ago, clean, cssKey, esc, hueOf, newId, plural, toast, upsertLocal } from "../core/helpers";
@@ -92,22 +93,24 @@ export async function setCheckins(d, on: boolean) {
 
 /* Run now on one job. A plain-words job runs here, like the main job. A job that runs a command in a repo needs the
    repo, so it runs in the cloud; so does any job with a schedule when this view can't use Claude. */
+/* an atom that reads the web does that only in the cloud, so once it (or this job) has a schedule, Run now runs there */
+export const cloudFirst = (d, j: any = null): boolean => readsWeb(d) && cloudOn(j || d);
 export async function runJob(d, j) {
-  if (!isCommandJob(j) && canRunHere()) return runDot(d.id, j.id);
+  if (!isCommandJob(j) && canRunHere() && !cloudFirst(d, j)) return runDot(d.id, j.id);
   if (!cloudOn(j)) { toast(isCommandJob(j) ? `Give ${jobTitle(j)} a schedule first: it works in your repo, so it runs in the cloud.` : `Running ${jobTitle(j)} here needs Claude in this view. Give it a schedule to run it in the cloud.`); return "skip"; }
   if (await cloudAct("fire", subOf(d, j), { quiet: true })) toast(`${jobTitle(j)} is running in the cloud. Its note lands in Chat.`);
   return "skip";
 }
 /* Run now on the main job: here with Claude, or in the cloud on its schedule when this view can't use Claude */
 export function runMain(d) {
-  if (canRunHere() || !cloudOn(d)) return runDot(d.id);
+  if ((canRunHere() && !cloudFirst(d)) || !cloudOn(d)) return runDot(d.id);
   return cloudAct("fire", subOf(d));
 }
 /* Run now on an atom whose main job is off: each of its jobs, the way that job runs */
 export async function runJobs(d) {
   const jobs = jobsOf(d);
   if (!jobs.length) { toast("It has no jobs yet. Add one on the Jobs tab."); S.tab = "schedule"; renderAll(); return; }
-  const here = jobs.filter(j => !isCommandJob(j) && canRunHere()), cloud = jobs.filter(j => !here.includes(j) && cloudOn(j));
+  const here = jobs.filter(j => !isCommandJob(j) && canRunHere() && !cloudFirst(d, j)), cloud = jobs.filter(j => !here.includes(j) && cloudOn(j));
   let n = 0;
   for (const j of cloud) if (await cloudAct("fire", subOf(d, j), { quiet: true })) n++;
   if (n) toast(`${d.name} is running ${n === 1 ? jobTitle(cloud[0]) : plural(n, "job")} in the cloud`);

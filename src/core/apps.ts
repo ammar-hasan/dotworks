@@ -14,7 +14,12 @@ export const KNOWN_APPS: Record<string, { short: string; does: string; hue: numb
   "Supabase": { short: "Supabase", does: "projects, tables, logs", hue: 158 },
   "ElevenLabs": { short: "ElevenLabs", does: "voice agents and audio", hue: 32 },
   "Disrupt Hub": { short: "Disrupt Hub", does: "AI-engineering knowledge hub, read-only", hue: 262 },
+  "The web": { short: "The web", does: "searched and read in its cloud runs, on its schedule", hue: 190 },
 };
+/* the web isn't an app: an atom that reads it searches and reads pages only in its scheduled cloud runs (runbook
+   step 3), so on this page it is never usable, never missing, and never something a routine has to be given */
+export const WEB = "The web";
+export const isWeb = (n: string) => n === WEB;
 const hueOfName = (n: string) => { let h = 7; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 export const appInfo = (n: string) => KNOWN_APPS[n] || { short: n, does: "", hue: hueOfName(n) };
 // servers that are Atoms' own plumbing, not apps a dot reads
@@ -26,6 +31,7 @@ export const LEGACY_SRC = { calendar: "Google Calendar", gmail: "Gmail" };
 export const srcName = s => LEGACY_SRC[s] || s;
 export const normSources = (arr): string[] => [...new Set((Array.isArray(arr) ? arr : []).map(x => srcName(String(x)).trim()).filter(n => n && n.length <= 80 && n !== SRV.cloud))];
 export const shortOf = n => appInfo(srcName(n)).short;
+export const readsWeb = (d): boolean => normSources(d?.sources).includes(WEB);
 // what a tool does, from its own annotations first, then its name
 export const stripTool = t => String(t).replace(/^(slack|agents|creative)_/, "");
 export const RISKY = /(^|_)(send|forward|reply|delete|trash|spam|share|execute|apply|deploy|merge|reset|rebase|pause|restore|archive|clear|drop|revoke|regenerate|run|generate|design|transcribe|edit_image|interrupt|remove|bulk)(_|$)|_sql$|create_project|create_branch|create_deployment|^schedule_message$/;
@@ -39,9 +45,9 @@ export function kindOf(server, tool) {
   return "act";
 }
 export const toolsOf = server => S.conn[server]?.tools || [];
-export const appUsable = n => !!NS.mcp && !!n && !isPlumbing(n) && !S.appsOff.has(n) && (!S.connLoaded || !!S.conn[n]);
+export const appUsable = n => !!NS.mcp && !!n && !isWeb(n) && !isPlumbing(n) && !S.appsOff.has(n) && (!S.connLoaded || !!S.conn[n]);
 export const appsAvail = () => appNames().filter(n => !S.appsOff.has(n));
 // apps your dots read that this copy can't reach: disconnected in Claude, or not among the apps it was published with
 export const appsMissing = (): string[] => !NS.mcp || !S.connLoaded ? [] :
-  [...new Set(S.dots.flatMap(d => normSources(d.sources)))].filter(n => !S.conn[n] && !isPlumbing(n)).sort((a, b) => appInfo(a).short.localeCompare(appInfo(b).short));
+  [...new Set(S.dots.flatMap(d => normSources(d.sources)))].filter(n => !S.conn[n] && !isPlumbing(n) && !isWeb(n)).sort((a, b) => appInfo(a).short.localeCompare(appInfo(b).short));
 export const humanTool = t => stripTool(t).replace(/_/g, " ");

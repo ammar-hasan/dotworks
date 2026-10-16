@@ -1,5 +1,5 @@
 /* ───── home ───── */
-.home{position:relative;flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(250px,1fr) auto;overflow-x:hidden;overflow-y:auto}
+.home{position:relative;flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(min-content,1fr) auto;overflow-x:hidden;overflow-y:auto}
 .home-h{position:relative;z-index:2;padding:34px 40px 0;display:flex;flex-direction:column;gap:10px;max-width:880px}
 .greet{font:900 clamp(30px,4.4vw,56px)/1 var(--f-dot);letter-spacing:.01em;text-transform:uppercase;overflow-wrap:anywhere}
 .voice{font:italic 400 19px/1.45 var(--f-letter);color:var(--ink-2);max-width:60ch}

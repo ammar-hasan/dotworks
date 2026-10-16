@@ -120,6 +120,11 @@ export function subscribe() {
     S.memory = snap.docs.map(x => ({ id: x.id, ...clone(x.data()) })).filter(m => typeof m.text === "string");
     S.memoryLoaded = true; renderAll();
   }, e => { S.memoryLoaded = true; diag("db.memory", e); });
+  // each atom's notebook, if it keeps one (features/notebook.ts)
+  col.where("type", "==", "notebook").onSnapshot(snap => {
+    const nbs = {}; for (const x of snap.docs) { const v = clone(x.data()); if (v && typeof v.dotId === "string" && typeof v.text === "string") nbs[v.dotId] = v; }
+    S.notebooks = nbs; S.notebooksLoaded = true; renderAll();
+  }, e => { S.notebooksLoaded = true; diag("db.notebooks", e); });
   userDoc("reads").onSnapshot(snap => { S.reads = snap.exists ? clone(snap.data()) : null; S.readsLoaded = true; if (!snap.exists) ensureReads(); renderAll(); }, e => diag("db.reads", e));
   userDoc("pings").onSnapshot(snap => { S.pings = snap.exists ? clone(snap.data()) : null; renderAll(); }, e => diag("db.pings", e));
 }

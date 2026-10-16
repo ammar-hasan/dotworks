@@ -87,6 +87,12 @@ const shots = [
   { name: "lead-chat-dark", scene: "lead", ...D, scheme: "dark", steps: [openDot("Friday")] },
   { name: "lead-jobs-light", scene: "lead", ...D, scheme: "light", steps: [openDot("Friday"), tab("schedule")] },
   { name: "lead-asks-held-light", scene: "lead", ...D, scheme: "light", steps: [nav("asks"), click('[data-act="held-toggle"]')] },
+  { name: "hunter-notebook-light", scene: "lead", ...D, scheme: "light", steps: [openDot("Product Hunter"), tab("notebook")] },
+  { name: "hunter-notebook-dark", scene: "lead", ...D, scheme: "dark", steps: [openDot("Product Hunter"), tab("notebook")] },
+  { name: "hunter-notebook-edit-dark", scene: "lead", ...D, scheme: "dark", steps: [openDot("Product Hunter"), tab("notebook"), click('#notebook [data-act="nb-edit"]')] },
+  { name: "m-hunter-notebook-light", scene: "lead", ...M, scheme: "light", steps: [openDotM("Product Hunter"), tab("notebook")] },
+  { name: "hunter-jobs-light", scene: "lead", ...D, scheme: "light", steps: [openDot("Product Hunter"), tab("schedule")] },
+  { name: "sheet-web-light", scene: "full", ...D, scheme: "light", steps: [async p => { await p.click('#homeActions [data-act="new"]'); await p.waitForTimeout(500); await p.evaluate(() => document.querySelector("#sh-nb")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(200); }] },
   { name: "lead-sheet-dark", scene: "full", ...D, scheme: "dark", steps: [async p => { await p.click('.field .orb-btn[data-act="lead-new"]'); await p.waitForTimeout(500); }] },
   { name: "m-lead-sheet-light", scene: "full", ...M, scheme: "light", steps: [async p => { await p.click('.field .orb-btn[data-act="lead-new"]'); await p.waitForTimeout(500); }] },
 ];
