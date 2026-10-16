@@ -23,8 +23,15 @@ export function ago(t) { if (!t) return "never"; const s = Math.round((Date.now(
 export function span(ms) { const m = Math.max(1, Math.round(ms / 60000)); if (m < 60) return m + "m"; const h = Math.floor(m / 60), r = m % 60; if (h < 24) return r ? `${h}h ${r}m` : `${h}h`; return Math.round(h / 24) + "d"; }
 export const headlineOf = text => { const l = String(text || "").split("\n").find(x => x.trim()); return l ? clean(l.replace(/^#+\s*/, "").replace(/\*\*/g, "")).trim() : ""; };
 export function md(src) {
-  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" target="_blank" rel="noopener">link</a>');
+  // [words](https://…) links the words; a bare address becomes "link". Links are set aside first so nothing else
+  // rewrites them (clean() has already removed the \u0000 used to mark their places).
+  const inline = t => {
+    const links: string[] = [], keep = (html: string) => { links.push(html); return `\u0000${links.length - 1}\u0000`; };
+    return esc(t).replace(/\[([^\]\n]{1,200})\]\((https?:\/\/[^\s)<]+)\)/g, (_, words, url) => keep(`<a href="${url}" target="_blank" rel="noopener">${words}</a>`))
+      .replace(/(https?:\/\/[^\s<\u0000]+[^\s<.,;:!?)\]\u0000])/g, url => keep(`<a href="${url}" target="_blank" rel="noopener">link</a>`))
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\u0000(\d+)\u0000/g, (_, i) => links[Number(i)]);
+  };
   let out = "", inList = false;
   for (const raw of clean(src).split("\n")) {
     const line = raw.trimEnd(), li = line.match(/^\s*(?:[-*•]|\d+\.)\s+(.*)/);

@@ -1589,6 +1589,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     const rt = makeRuntime({ triggers });
     rt.db.store.set(`data/users/${UID}/dot_w`, { type: "dot", name: "Product Hunter", responsibility: "Find what's launching and trending.", rules: [], sources: ["The web"], cadence: "daily", tier: "default", hue: 190, notebook: true, createdAt: 1, lastRunAt: null, cloud: { triggerId: "trig_w", say: "Every weekday at 08:52", since: 1, missing: [] } });
     rt.db.store.set(`data/users/${UID}/job_w1`, { type: "job", dotId: "dot_w", title: "Weekly patterns", task: "Look back over the week and make three predictions.", rules: [], repo: null, run: null, when: "twice", createdAt: 2, cloud: null, lastRunAt: null });
+    rt.db.store.set(`data/users/${UID}/dot_w/runs/run_w1`, { startedAt: Date.now() - 7200e3, finishedAt: Date.now() - 7000e3, status: "done", source: "cloud", text: "## First hunt\n- Agent tools keep showing up on [Product Hunt](https://www.producthunt.com/products/kilo-code?a=1&b=2), like **Kilo Code**\n- Also see https://example.com/x.", steps: [], actionIds: [], thread: [] });
     rt.db.store.set(`data/users/${UID}/nb_dot_w`, { type: "notebook", dotId: "dot_w", text: "## Trends\n- Agent memory: 3 launches\n## Predictions\n- 60%: voice agents for clinics by November", updatedAt: Date.now() - 3600e3, by: "cloud" });
     const { w, d, errors } = await load(rt, { wait: 300 });
     // the form offers the web and a notebook
@@ -1607,6 +1608,9 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     // its page: a Notebook tab with what it follows
     click(w, d.querySelector('#dotList [data-id="dot_w"]')); await tick(60);
     ok(!!d.querySelector('#dvTabs [data-tab="notebook"]') && !/!/.test(text(d, '#dvTabs [data-tab="schedule"]')), "it has a Notebook tab, and its schedule lacks nothing");
+    if (!d.querySelector("#msgs .letter")) { click(w, d.querySelector('#dvTabs [data-tab="chat"]')); await tick(200); }
+    const named = [...d.querySelectorAll("#msgs .letter a")].find(a => a.getAttribute("href") === "https://www.producthunt.com/products/kilo-code?a=1&b=2");
+    ok(named && named.textContent === "Product Hunt" && !/\]\(/.test(text(d, "#msgs .letter")) && d.querySelector('#msgs .letter a[href="https://example.com/x"]')?.textContent === "link" && !!d.querySelector("#msgs .letter strong"), "a note's [words](link) shows as linked words, and bare addresses still link");
     click(w, d.querySelector('#dvTabs [data-tab="notebook"]')); await tick(40);
     ok(/Agent memory: 3 launches/.test(text(d, "#notebook")) && /by its cloud run/.test(text(d, "#notebook")), "the Notebook tab shows what it follows, and who wrote it");
     // Wake: it reads the web, so with a schedule it wakes in the cloud
