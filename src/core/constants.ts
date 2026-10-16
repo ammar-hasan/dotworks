@@ -63,6 +63,8 @@ export const ACCS = ["none", "glasses", "shades", "headphones", "antenna", "bean
 export const SV = (p, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${p}</svg>`;
 export const ICON = {
   home: SV('<path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>'),
+  catchup: SV('<rect x="4" y="8" width="14" height="12" rx="2.5"/><path d="M7 5h11a2 2 0 0 1 2 2v9"/><path d="M8 14l2.2 2.2L14.5 12"/>'),
+  check: SV('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   inbox: SV('<path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13h4l1.5 2.5h5L16 13h4"/>'),
   plug: SV('<path d="M9 7V3M15 7V3"/><path d="M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>'),
   voice: SV('<path d="M5 9.5h3l4.5-4v13L8 14.5H5z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>'),

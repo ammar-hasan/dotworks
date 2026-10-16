@@ -3,6 +3,7 @@ import { diag } from "../core/diag";
 import { $, esc, fmtWhen, hueOf, plural, reconcile, span } from "../core/helpers";
 import { NS, S, cloudOn, curDot, jobDriven, isDue, jobsOf, pending } from "../core/state";
 import { cloudFiringFor, missingApps } from "../features/cloud";
+import { unreadDots } from "../features/attention";
 import { renderAcct } from "./account";
 import { isLead, avatarHtml, stateOf } from "./characters";
 import { renderSheet } from "../views/builder";
@@ -14,8 +15,8 @@ export function renderAll() {
   catch (e) { diag("render", e); }
 }
 export function renderShell() {
-  const n = pending().length;
-  const navItems = [["home", "Home", ICON.home, ""], ["asks", "Asks", ICON.inbox, n ? String(n) : ""], ["seeds", "Elements", ICON.atom, ""], ["apps", "Apps", ICON.plug, ""]];
+  const n = pending().length, u = unreadDots().length;
+  const navItems = [["home", "Home", ICON.home, ""], ["catchup", "Catch up", ICON.catchup, u ? String(u) : ""], ["asks", "Asks", ICON.inbox, n ? String(n) : ""], ["seeds", "Elements", ICON.atom, ""], ["apps", "Apps", ICON.plug, ""]];
   const navHtml = navItems.map(([v, label, ic, c]) => `<button class="nav-i" data-nav="${v}" ${S.view === v ? 'aria-current="page"' : ""}>${ic}<span>${label}</span><span class="count">${c}</span></button>`).join("");
   if ($("#nav").innerHTML !== navHtml) $("#nav").innerHTML = navHtml;
   if (!$("#sideNew").innerHTML) $("#sideNew").innerHTML = ICON.plus;

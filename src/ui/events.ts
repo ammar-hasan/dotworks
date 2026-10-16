@@ -24,6 +24,7 @@ import { paintApps, toggleApp } from "../views/apps";
 import { closeSheet, draftOf, draftWithClaude, openLead, openNew, paintPeoplePicker, paintRepoField, prefixOf, refreshLook, repoListHtml, saveBuilder, searchPeople } from "../views/builder";
 import { paintKnow } from "../views/know";
 import { clearNotebook, editNotebook, paintNotebook, saveNotebookEdit } from "../features/notebook";
+import { catchAgain, catchAllRead, catchDone, catchLater, catchQueue } from "../features/catchup";
 import { paintComposer } from "../views/dot";
 import { renderField } from "../views/home";
 import { renderHorizon, startDay, watchDay } from "../views/horizon";
@@ -168,6 +169,12 @@ document.addEventListener("click", ev => {
     case "mem-save": { const t = memText(S.knowEdit[id]); if (t.length < 6) { toast("Say it in a sentence."); break; } delete S.knowEdit[id]; (document.activeElement as any)?.blur?.(); memUpdate(id, { text: t, editedAt: Date.now() }, "Saved"); paintKnow(true); break; }
     case "mem-forget": S.knowOpen["rm:" + id] = true; paintKnow(true); break;
     case "mem-forget-no": delete S.knowOpen["rm:" + id]; paintKnow(true); break;
+    // catch up (features/catchup.ts)
+    case "cu-done": cuCommit(id, "done"); break;
+    case "cu-later": cuCommit(id, "later"); break;
+    case "cu-open": openDot(id, "chat"); break;
+    case "cu-all": catchAllRead(); break;
+    case "cu-again": catchAgain(); break;
     // an atom's notebook (features/notebook.ts)
     case "nb-edit": editNotebook(true); break;
     case "nb-cancel": editNotebook(false); break;
@@ -245,6 +252,12 @@ document.addEventListener("keydown", ev => {
     return;
   }
   if (typing || ev.metaKey || ev.ctrlKey || ev.altKey || S.sheet) return;
+  if (S.view === "catchup" && ["ArrowRight", "ArrowLeft", "o"].includes(ev.key)) {
+    const id = catchQueue().now[0]?.id; if (!id) return;
+    ev.preventDefault();
+    if (ev.key === "o") openDot(id, "chat"); else cuCommit(id, ev.key === "ArrowRight" ? "done" : "later");
+    return;
+  }
   if (ev.key === "n" || ev.key === "N") { if (S.uid) { ev.preventDefault(); openNew(null); } }
   else if ((ev.key === "w" || ev.key === "W") && S.view === "dot") { ev.preventDefault(); const d = curDot(); if (d && jobDriven(d)) runJobs(d); else if (d && cloudFirst(d)) runMain(d); else runDot(S.selected); }
   else if (ev.key === "]") { if (S.dots.length) { ev.preventDefault(); cycle(1); } }
@@ -258,6 +271,42 @@ document.addEventListener("keydown", ev => {
   S.tab = tabs[(i + (ev.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length]; renderAll(); $(`#tab-${S.tab}`)?.focus(); ev.preventDefault();
 });
 window.addEventListener("resize", () => { if (S.view === "home") renderField(); });
+
+/* catch up: the card flies off the way it went, then the next one shows. Swipe right is Done, left is Later. */
+function cuCommit(id: string, how: "done" | "later") {
+  const el = document.querySelector(`.cu-card[data-cu="${cssKey(id)}"]`) as HTMLElement | null;
+  const finish = () => { S.cuDrag = false; if (how === "done") catchDone(id); else catchLater(id); };
+  if (!el || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) { finish(); return; }
+  const dir = how === "done" ? 1 : -1;
+  S.cuDrag = true; el.classList.remove("dragging"); el.dataset.dir = dir > 0 ? "r" : "l"; el.style.setProperty("--pull", "1");
+  el.style.transform = `translateX(${dir * 115}%) rotate(${dir * 10}deg)`; el.style.opacity = "0";
+  setTimeout(finish, 210);
+}
+let cuDragging: { card: HTMLElement; id: string; x: number; y: number; dx: number; on: boolean; pid: number } | null = null;
+document.addEventListener("pointerdown", ev => {
+  const t = ev.target as HTMLElement, card = t.closest?.(".cu-card") as HTMLElement | null;
+  if (!card || t.closest("button,a,input,textarea,select") || (ev.button ?? 0) > 0) return;
+  cuDragging = { card, id: card.dataset.cu || "", x: ev.clientX, y: ev.clientY, dx: 0, on: false, pid: ev.pointerId };
+});
+document.addEventListener("pointermove", ev => {
+  const g = cuDragging; if (!g || ev.pointerId !== g.pid) return;
+  const dx = ev.clientX - g.x, dy = ev.clientY - g.y;
+  if (!g.on) {
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { cuDragging = null; return; } // a scroll, not a swipe
+    if (Math.abs(dx) < 10) return;
+    g.on = true; S.cuDrag = true; g.card.classList.add("dragging"); try { g.card.setPointerCapture(ev.pointerId); } catch {}
+  }
+  g.dx = dx; g.card.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`;
+  g.card.style.setProperty("--pull", String(Math.min(1, Math.abs(dx) / 110))); g.card.dataset.dir = dx > 0 ? "r" : "l";
+});
+const cuEnd = () => {
+  const g = cuDragging; cuDragging = null; if (!g || !g.on) return;
+  g.card.classList.remove("dragging");
+  if (Math.abs(g.dx) > 110) { cuCommit(g.id, g.dx > 0 ? "done" : "later"); return; }
+  g.card.style.transform = ""; g.card.style.removeProperty("--pull"); delete g.card.dataset.dir; S.cuDrag = false;
+};
+document.addEventListener("pointerup", cuEnd);
+document.addEventListener("pointercancel", cuEnd);
 
 /* clock: horizon "now", timers, freshness — repaint only, no writes */
 setInterval(() => {

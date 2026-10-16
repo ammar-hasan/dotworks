@@ -1642,6 +1642,44 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(!rt.db.store.get(`data/users/${UID}/nb_dot_w`) && /Nothing yet/.test(text(d, "#notebook")), "and clear it");
     ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   }
+  console.log("39. Catch up: every atom's new notes in one place, one card at a time");
+  {
+    const rt = makeRuntime();
+    const now = Date.now(), U = `data/users/${UID}`;
+    rt.db.store.set(`${U}/reads`, { since: now - 2 * 864e5, at: {} });
+    rt.db.store.set(`${U}/dot_a`, { type: "dot", name: "Meeting prep", responsibility: "Look at my meetings.", rules: [], sources: ["calendar"], cadence: "daily", tier: "default", hue: 214, createdAt: 1, lastRunAt: now - 3600e3 });
+    rt.db.store.set(`${U}/dot_a/runs/run_a1`, { startedAt: now - 3600e3, finishedAt: now - 3500e3, status: "done", source: "cloud", text: "## Two meetings need agendas\n- Design review at 15:00", steps: [], actionIds: [], thread: [] });
+    rt.db.store.set(`${U}/dot_a/runs/run_a0`, { startedAt: now - 3 * 864e5, finishedAt: now - 3 * 864e5 + 1e5, status: "done", source: "cloud", text: "## An old note you already saw", steps: [], actionIds: [], thread: [] });
+    rt.db.store.set(`${U}/dot_b`, { type: "dot", name: "Product Hunter", responsibility: "Hunt launches.", rules: [], sources: ["The web"], cadence: "daily", tier: "default", hue: 172, createdAt: 2, lastRunAt: now - 7200e3 });
+    rt.db.store.set(`${U}/dot_b/runs/run_b1`, { startedAt: now - 7200e3, finishedAt: now - 7100e3, status: "done", source: "cloud", text: "## Agent memory is heating up\n- 5 launches this week", steps: [], actionIds: [], thread: [] });
+    rt.db.store.set(`${U}/dot_c`, { type: "dot", name: "Quiet one", responsibility: "x", rules: [], sources: ["calendar"], cadence: "weekly", tier: "default", hue: 30, createdAt: 3, lastRunAt: now - 10 * 864e5 });
+    rt.db.store.set(`${U}/act_cu`, { type: "action", source: "cloud", dotId: "dot_a", runId: "run_a1", state: "pending", createdAt: now - 3500e3, kind: "note", title: "Add an agenda", why: "x", draft: "x" });
+    const { w, d, errors } = await load(rt, { wait: 300 });
+    ok(/Catch up\s*2/.test(text(d, '#nav [data-nav="catchup"]')) && /Catch up · 2/.test(text(d, "#homeActions")), "the nav and Home say 2 atoms have notes you haven't read");
+    click(w, d.querySelector('#nav [data-nav="catchup"]')); await tick(120);
+    const card = () => d.querySelector(".cu-card");
+    ok(/2 atoms to catch up on/.test(text(d, "#cuTitle")) && card()?.dataset.cu === "dot_a" && /Two meetings need agendas/.test(text(d, ".cu-card")) && !/old note you already saw/.test(text(d, ".cu-card")), "the newest first, with only the notes you haven't read");
+    ok(/1 ask from Meeting prep waits for you/.test(text(d, ".cu-card")) && /2 left/.test(text(d, ".cu-pos")), "it says what else waits from that atom, and where you are");
+    click(w, d.querySelector('[data-act="cu-later"]')); await tick(300);
+    ok(card()?.dataset.cu === "dot_b" && /Agent memory is heating up/.test(text(d, ".cu-card")), "Later moves on, keeping it unread");
+    d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); await tick(300);
+    ok(/1 atom kept for later/.test(text(d, "#cuTitle")) && /Meeting prep is still unread/.test(text(d, "#cu")), "→ marks it read; then what you kept for later is waiting");
+    click(w, d.querySelector('[data-act="cu-again"]')); await tick(150);
+    ok(card()?.dataset.cu === "dot_a", "go through them again");
+    // a swipe right is Done
+    const c = card(), pe = (type, x) => { const e = new w.MouseEvent(type, { bubbles: true, clientX: x, clientY: 200, button: 0 }); c.dispatchEvent(e); };
+    pe("pointerdown", 100); pe("pointermove", 125); pe("pointermove", 260); pe("pointerup", 260); await tick(400);
+    ok(/You're all caught up/.test(text(d, "#cuTitle")) && !/\d/.test(text(d, '#nav [data-nav="catchup"] .count')) && !/Catch up ·/.test(text(d, "#homeActions") || ""), "a swipe right reads it too; all caught up, and the count is gone");
+    await tick(900);
+    const rd = rt.db.store.get(`${U}/reads`);
+    ok(rd.at.dot_a > now - 60e3 && rd.at.dot_b > now - 60e3 && !rd.at.dot_c, "what you read is saved, the same record opening a chat uses");
+    const undo = [...d.querySelectorAll(".toast")].find(t => /Meeting prep: read/.test(t.textContent));
+    click(w, undo.querySelector("button")); await tick(200);
+    ok(!rt.db.store.get(`${U}/reads`).at.dot_a && /1 atom to catch up on/.test(text(d, "#cuTitle")), "Undo puts it back");
+    click(w, d.querySelector('[data-act="cu-open"]')); await tick(200);
+    ok(d.querySelector('#dvTabs [data-tab="chat"]')?.getAttribute("aria-selected") === "true" && text(d, "#dvName") === "Meeting prep", "Open chat takes you to its conversation");
+    ok(errors.length === 0, "no errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  }
   console.log("20. Claude declined for this page");
   {
     const rt8 = makeRuntime({ perms: { sample: "denied" } });

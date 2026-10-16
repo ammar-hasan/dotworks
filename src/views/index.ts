@@ -6,6 +6,7 @@ import { paintApps } from "./apps";
 import { paintDot } from "./dot";
 import { paintHome } from "./home";
 import { paintSeeds } from "./seeds";
+import { paintCatchup } from "./catchup";
 
 /* ═════════ views ═════════ */
 export let viewKey = "";
@@ -54,6 +55,8 @@ export function buildView() {
     S.settingsKey = "";
   } else if (S.view === "asks") {
     v.innerHTML = `<section class="page"><header class="page-h"><span class="eyebrow">Waiting on you</span><h1 class="title" id="asksTitle"></h1><p class="sub">Your atoms never act alone. Each ask waits here until you say yes — then one click does it.</p><div class="chips" id="asksFilter"></div></header><div class="page-body"><div class="asks" id="asksList"></div><div id="handled"></div></div></section>`;
+  } else if (S.view === "catchup") {
+    v.innerHTML = `<section class="page cu-page"><header class="page-h"><span class="eyebrow">Catch up</span><h1 class="title" id="cuTitle"></h1><p class="sub">Your atoms' new notes, one atom at a time. Done marks them read, the same as opening its chat. Later keeps them for now.</p></header><div class="page-body"><div class="cu" id="cu"></div></div></section>`;
   } else if (S.view === "apps") {
     v.innerHTML = `<section class="page"><header class="page-h"><span class="eyebrow">Your apps</span><h1 class="title">Apps</h1><p class="sub">Everything you've connected in Claude. Turn an app on and your atoms can read it and propose actions with it. Nothing runs until you approve.</p></header><div class="page-body"><div class="appgrid" id="appGrid"></div><p class="fine" id="appsFoot"></p></div></section>`;
   } else if (S.view === "seeds") {
@@ -69,6 +72,7 @@ export function buildView() {
 export function paintView() {
   if (S.view === "dot") paintDot();
   else if (S.view === "asks") paintAsks();
+  else if (S.view === "catchup") paintCatchup();
   else if (S.view === "seeds") paintSeeds();
   else if (S.view === "apps") paintApps();
   else paintHome();

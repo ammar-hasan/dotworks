@@ -1,3 +1,4 @@
+import { unreadDots } from "../features/attention";
 import { ICON, REDUCED } from "../core/constants";
 import { $, clamp, cssKey, fmtTime, plural, reconcile, span } from "../core/helpers";
 import { NS, S, awake, dueDots, pending } from "../core/state";
@@ -43,6 +44,8 @@ export function paintHome() {
   const notes = S.dots.filter(d => S.latest[d.id]?.headline).length, due = dueDots().length;
   if (S.uid && NS.sample && !S.running && notes >= 2 && !S.digest && !S.digestOff) acts += `<button class="btn" data-act="digest" ${S.digestBusy ? "disabled" : ""}>${S.digestBusy ? "Reading…" : "Sum it up"}</button>`;
   if (S.uid && NS.sample && !S.running && due && S.dots.length) acts += `<button class="btn" data-act="run-due">${ICON.bolt}Wake ${due} due</button>`;
+  const unread = unreadDots().length;
+  if (S.uid && unread && S.dots.length) acts += `<button class="btn" data-nav="catchup">${ICON.catchup}Catch up · ${unread}</button>`;
   if (S.uid && NS.db) acts += `<button class="btn pri" data-act="new">${ICON.plus}New atom</button>`;
   const A = $("#homeActions"); if (A.innerHTML !== acts) A.innerHTML = acts;
   paintTell(); renderField(); renderHorizon(); paintPeek(); initSky();

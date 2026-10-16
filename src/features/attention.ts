@@ -73,9 +73,9 @@ export function markRead(d) {
   clearTimeout(readTimer);
   readTimer = setTimeout(() => userDoc("reads").set(clone(S.reads)).catch(e => diag("db.reads", e)), 800);
 }
-// counting starts when you first have a super atom
+// counting what you've read starts the first time this page loads (Catch up and the super atom's pings use it)
 export function ensureReads() {
-  if (S.reads || !S.readsLoaded || S.readsTried || !NS.db || !S.uid || !leadOf()) return;
+  if (S.reads || !S.readsLoaded || S.readsTried || !NS.db || !S.uid) return;
   S.readsTried = true; S.reads = { since: Date.now(), at: {} };
   userDoc("reads").set(clone(S.reads)).catch(e => { S.readsTried = false; diag("db.reads", e); });
 }

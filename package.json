@@ -1,6 +1,6 @@
 {
   "name": "dotworks",
-  "version": "7.1.2",
+  "version": "7.2.0",
   "description": "Small character assistants that read your apps and ask before they act. Published as a Claude artifact.",
   "private": true,
   "type": "module",

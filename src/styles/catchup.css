@@ -1,0 +1,39 @@
+/* Catch up: one atom's new notes at a time, as a card you swipe right (done) or left (later) */
+.cu{max-width:640px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.cu-deck{position:relative;padding-bottom:18px}
+/* the cards waiting behind this one, peeking out underneath */
+.cu-deck[data-behind]:not([data-behind="0"])::before,.cu-deck[data-behind="2"]::after{content:"";position:absolute;left:0;right:0;bottom:9px;height:60px;border-radius:22px;background:var(--panel);border:1px solid var(--line);transform:scale(.96);z-index:0}
+.cu-deck[data-behind="2"]::after{bottom:0;transform:scale(.92);opacity:.7}
+.cu-card{position:relative;z-index:1;background:var(--paper);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:20px 22px 16px;display:flex;flex-direction:column;gap:14px;touch-action:pan-y;user-select:none;transition:transform .2s ease,opacity .2s ease;border-top:4px solid hsl(var(--h) 70% 58%)}
+.cu-card.dragging{transition:none;cursor:grabbing}
+.cu-h{display:flex;align-items:center;gap:16px}
+.cu-who{display:flex;flex-direction:column;min-width:0;flex:1}
+.cu-who strong{font:650 17px/1.25 var(--f-ui)}
+.cu-who span{font:400 12px/1.4 var(--f-mono);color:var(--muted)}
+.cu-pos{font:500 12px var(--f-mono);color:var(--muted);white-space:nowrap}
+.cu-body{display:flex;flex-direction:column;gap:14px;max-height:min(56vh,560px);overflow:auto;user-select:text}
+.cu-note + .cu-note{border-top:1px solid var(--line);padding-top:12px}
+.cu-meta{font:400 12px/1.4 var(--f-mono);color:var(--muted);margin:0 0 6px}
+.cu-letter{background:none;border:0;box-shadow:none;padding:0;font-size:16px}
+.cu-asks{margin:0;font-size:14px;color:var(--ink-2);background:var(--panel);border-radius:12px;padding:9px 12px}
+.cu-f{display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:4px}
+.cu-f [data-act="cu-open"]{margin-right:auto}
+/* "Done" and "Later" show as you drag */
+.cu-tag{position:absolute;z-index:3;top:16px;background:var(--paper);padding:5px 11px;border-radius:999px;font:700 12px/1 var(--f-ui);letter-spacing:.02em;opacity:0;pointer-events:none;transition:opacity .1s}
+.cu-tag-r{left:18px;color:var(--ok);border:2px solid var(--ok);transform:rotate(-8deg)}
+.cu-tag-l{right:18px;color:var(--muted);border:2px solid var(--muted);transform:rotate(8deg)}
+.cu-card[data-dir="r"] .cu-tag-r,.cu-card[data-dir="l"] .cu-tag-l{opacity:var(--pull,0)}
+.cu-hint{margin:0;text-align:center;font-size:13px;color:var(--muted)}
+.cu-all{margin:0;text-align:center}
+.cu-end{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:36px 0;color:var(--ink-2)}
+.cu-end p{margin:0;max-width:44ch}
+.cu-faces{display:flex;gap:6px;justify-content:center}
+.cu-done-mark{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--panel);color:var(--ok)}
+.cu-done-mark svg{width:28px;height:28px}
+@media (max-width:760px){
+  .cu-card{padding:16px 16px 12px;border-radius:18px}
+  .cu-body{max-height:none}
+  .cu-hint{font-size:12px}
+  .cu-keys{display:none}
+}
+@media (prefers-reduced-motion:reduce){.cu-card{transition:none}}
