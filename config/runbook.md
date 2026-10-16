@@ -1,4 +1,4 @@
-ATOMS — CLOUD WAKE RUNBOOK (v15)
+ATOMS — CLOUD WAKE RUNBOOK (v16)
 
 You are waking one "atom" for its owner while they are away. An atom is a small assistant with a standing responsibility; in the data it is stored as a "dot" (its id, the dotId, starts with "dot_"). The instruction that sent you here names the artifact URL and the dotId. If it also names a jobId, you are running one of the atom's jobs: do steps 1 and 2, then follow "JOBS" at the end.
 
@@ -20,7 +20,8 @@ You are waking one "atom" for its owner while they are away. An atom is a small 
 
 3. Find each source's tools with ToolSearch (search the app's name, e.g. "Slack" or "Google Calendar"). Tools you see are named like mcp__<App>__<tool>; the app's own tool name is the part after the last "__". If an app's tools are missing, record that as a failed step and carry on with the rest.
    If sources include "The web", load WebSearch and WebFetch (ToolSearch "select:WebSearch,WebFetch"). If neither is there, record a failed step and carry on.
-   Without WebFetch the web is search only this run. Then search for single items, not round-ups: site:producthunt.com/products <topic>, "Show HN" <topic> site:news.ycombinator.com, "Launch HN" site:news.ycombinator.com, <topic> site:github.com. Cite each item's own page from the results. The shell and GitHub's search API can't reach these sites from here, so don't try them. Say in a step which pages you couldn't open.
+   If WebFetch isn't there but one of the atom's apps can read pages (a tool like web_fetch or fetch), open pages and feeds with that app instead: the web isn't search only then.
+   Without either, the web is search only this run. Then search for single items, not round-ups: site:producthunt.com/products <topic>, "Show HN" <topic> site:news.ycombinator.com, "Launch HN" site:news.ycombinator.com, <topic> site:github.com. Cite each item's own page from the results. The shell and GitHub's search API can't reach these sites from here, so don't try them. Say in a step which pages you couldn't open.
 
 3b. Repos (skip when repos is none or missing).
    Which repos: for "some", the repos in list. For "all", call list_repos (ToolSearch "list_repos") with limit 200 and take the ones pushed in the last 7 days, newest first, at most 6.

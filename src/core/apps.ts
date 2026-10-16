@@ -14,6 +14,7 @@ export const KNOWN_APPS: Record<string, { short: string; does: string; hue: numb
   "Supabase": { short: "Supabase", does: "projects, tables, logs", hue: 158 },
   "ElevenLabs": { short: "ElevenLabs", does: "voice agents and audio", hue: 32 },
   "Disrupt Hub": { short: "Disrupt Hub", does: "AI-engineering knowledge hub, read-only", hue: 262 },
+  "Parallel Search": { short: "Parallel", does: "web search, and reading pages and feeds", hue: 196 },
   "The web": { short: "The web", does: "searched and read in its cloud runs, on its schedule", hue: 190 },
 };
 /* the web isn't an app: an atom that reads it searches and reads pages only in its scheduled cloud runs (runbook
