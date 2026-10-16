@@ -190,6 +190,7 @@ function makeRuntime(opts = {}) {
   const mcp = {
     async listTools() { return { servers: [...(opts.noCal ? [] : [{ server: "Google Calendar", authStatus: "connected", tools: [{ name: "list_events", annotations: { readOnlyHint: true } }, { name: "update_event" }, { name: "delete_event", annotations: { destructiveHint: true } }, ...(opts.undo ? [{ name: "get_event", annotations: { readOnlyHint: true } }, { name: "create_event" }] : [])] }]), { server: "Gmail", authStatus: "unknown", tools: [{ name: "search_threads" }, { name: "create_draft" }, ...(opts.undo ? [{ name: "delete_draft" }] : []), ...(opts.bigMail ? BIG_MAIL.map(name => ({ name })) : [])] }, { server: "Claude Code Remote", authStatus: "connected", tools: [{ name: "list_triggers" }] },
       ...(opts.slack ? [{ server: "Slack", authStatus: "connected", tools: [{ name: "slack_search_public", annotations: { readOnlyHint: true } }, { name: "slack_send_message" }, { name: "slack_send_message_draft" }] }] : []),
+      ...(opts.parallel ? [{ server: "Parallel Search", authStatus: "connected", tools: [{ name: "web_search" }, { name: "web_fetch" }] }] : []),
       ...(opts.linear ? [{ server: "Linear", authStatus: "connected", tools: [{ name: "list_issues", annotations: { readOnlyHint: true } }, { name: "create_issue" }, { name: "delete_issue" }] }] : [])] }; },
     async describeTool(server, tool) {
       if (opts.bigMail && server === "Gmail" && BIG_MAIL.includes(tool)) { await tick(1); return { name: tool, description: `Gmail ${tool.replace(/_/g, " ")}: changes the owner's mailbox. Use it only with ids read from Gmail first, and never for anything the owner hasn't asked to change. `.repeat(2), inputSchema: { type: "object", properties: Object.fromEntries(Array.from({ length: 30 }, (_, k) => [`field_${k}`, { type: "string", description: "A long explanation of this field that runs on and on so the schema gets big. ".repeat(3) }])), required: ["field_0"] } }; }
@@ -1586,7 +1587,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
   console.log("38. An atom can read the web on its schedule and keep a notebook between runs");
   {
     const triggers = [{ id: "trig_w", name: "Atoms · Product Hunter · ab12", enabled: true, next_run_at: iso(5 * 3600e3), mcp_connections: [], last_run: { status: "ROUTINE_RUN_STATUS_SUCCEEDED", fired_at: iso(-7200e3), finished_at: iso(-7000e3) } }];
-    const rt = makeRuntime({ triggers });
+    const rt = makeRuntime({ triggers, parallel: true });
     rt.db.store.set(`data/users/${UID}/dot_w`, { type: "dot", name: "Product Hunter", responsibility: "Find what's launching and trending.", rules: [], sources: ["The web"], cadence: "daily", tier: "default", hue: 190, notebook: true, createdAt: 1, lastRunAt: null, cloud: { triggerId: "trig_w", say: "Every weekday at 08:52", since: 1, missing: [] } });
     rt.db.store.set(`data/users/${UID}/job_w1`, { type: "job", dotId: "dot_w", title: "Weekly patterns", task: "Look back over the week and make three predictions.", rules: [], repo: null, run: null, when: "twice", createdAt: 2, cloud: null, lastRunAt: null });
     rt.db.store.set(`data/users/${UID}/dot_w/runs/run_w1`, { startedAt: Date.now() - 7200e3, finishedAt: Date.now() - 7000e3, status: "done", source: "cloud", text: "## First hunt\n- Agent tools keep showing up on [Product Hunt](https://www.producthunt.com/products/kilo-code?a=1&b=2), like **Kilo Code**\n- Also see https://example.com/x.", steps: [], actionIds: [], thread: [] });
@@ -1604,7 +1605,8 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     ok(scout && JSON.stringify(scout.sources) === '["The web"]' && scout.notebook === true, "saved reading only the web, with a notebook: " + JSON.stringify(scout && { s: scout.sources, nb: scout.notebook }));
     // the web is never a missing app
     click(w, d.querySelector('#nav [data-nav="apps"]')); await tick(30);
-    ok(![...d.querySelectorAll("#appGrid .appcard")].some(c => /web/i.test(c.dataset.key || "")), "the web isn't an app to connect");
+    ok(![...d.querySelectorAll("#appGrid .appcard")].some(c => c.dataset.key === "The web"), "the web isn't an app to connect");
+    ok(/2 things it can read · 0 actions it can propose/.test(text(d, '#appGrid .appcard[data-key="Parallel Search"]')), "a page reader's web_search and web_fetch only read, so they never become asks");
     // its page: a Notebook tab with what it follows
     click(w, d.querySelector('#dotList [data-id="dot_w"]')); await tick(60);
     ok(!!d.querySelector('#dvTabs [data-tab="notebook"]') && !/!/.test(text(d, '#dvTabs [data-tab="schedule"]')), "it has a Notebook tab, and its schedule lacks nothing");

@@ -42,7 +42,8 @@ export function kindOf(server, tool) {
   const t = stripTool(tool);
   const draftOnly = /draft/.test(t) && !/delete|trash/.test(t);
   if (ann.destructiveHint === true || (!draftOnly && (RISKY.test(t) || RISKY.test(tool)))) return "risky";
-  if (/^(list|get|search|read|query|fetch|find|suggest|download|semantic_search|calculate)(_|$)/.test(t)) return "read";
+  // a web search or page reader (web_search, web_fetch) only reads too
+  if (/^(web_)?(list|get|search|read|query|fetch|find|suggest|download|semantic_search|calculate)(_|$)/.test(t)) return "read";
   return "act";
 }
 export const toolsOf = server => S.conn[server]?.tools || [];
