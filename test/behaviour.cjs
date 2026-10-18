@@ -1451,6 +1451,7 @@ const dotsIn = rt => [...rt.db.store.entries()].filter(([k, v]) => k.startsWith(
     click(w, d.querySelector(`#dotList [data-id="${lead.id}"]`)); await tick(60);
     click(w, d.querySelector('#dvAct [data-act="run"]')); await tick(700);
     ok(/super atom/.test(rt.flags.lastWake) && /Your team/.test(rt.flags.lastWake) && /Meeting prep: Look at my meetings/.test(rt.flags.lastWake) && /That's all for now/.test(rt.flags.lastWake), "the super atom's check-in looks across your team");
+    ok(/chief of staff/.test(rt.flags.lastWake) && /connections between signals/.test(rt.flags.lastWake) && /Never just repeat another atom's note/.test(rt.flags.lastWake) && /said as the conclusion/.test(rt.flags.lastWake) && lead.notebook === true && lead.tier === "complex", "it's asked for insight, not a relay, and starts with a notebook and the deepest mind");
     // its learning job reads only what you did, and suggests
     click(w, d.querySelector('#dvTabs [data-tab="schedule"]')); await tick(30);
     ok(/reads only what you do and say in Atoms/.test(text(d, "#jobs")), "its learning job says what it reads");

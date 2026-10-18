@@ -12,14 +12,14 @@ import { addJob, jobTitle, taskJob } from "./jobs";
    only within the budget you set. It comes with one job, "Learn from what I do", that reads only what you do and say
    in Atoms. Like every atom it never acts on its own: whatever should change is an ask you approve. */
 
-export const LEAD_JOB = "Every few hours, tell me what's new across my atoms and my apps, but only what's worth my time today. Learn how I like to work from what I tell you and what I do with asks, and keep it on your You tab. Suggest better ways to work: a rule for one of my atoms, a new job, or a new atom.";
-export const LEAD_RULES = ["Keep each update to five lines", "Say which atom each thing comes from"];
+export const LEAD_JOB = "Be my chief of staff. Keep a running picture of what I'm driving, what's open and what's coming in the next 48 hours, across my atoms and apps. Every few hours, tell me only what it means and what to do: connect signals, warn me before things slip, chase what's been waiting, and recommend the next move. Learn how I like to work from what I tell you and what I do. Suggest better ways to work: a rule for one of my atoms, a new job, or a new atom.";
+export const LEAD_RULES = ["Lead with the conclusion, then at most five lines", "Every line says what, why it matters, and what you'd do", "Never just repeat another atom's note: add what it means or leave it out", "Name the sources at the end of each line, like (Ketchup, Calendar)"];
 export const LEARN_TASK = "Look at what I did in Atoms since you last learned: what I approved, what I changed before approving, what I set aside or undid, how I answered questions, and what I told my atoms in chat. Suggest at most 3 things about how I like to work, each for me to confirm.";
 export const LEARN_TITLE = "Learn from what I do";
 
 // the form for a new super atom (views/builder.ts); with one already, its page instead
 export function leadDraft() {
-  return { pid: newId("dot_"), role: "lead", voiceName: "", name: "Friday", responsibility: LEAD_JOB, rulesText: LEAD_RULES.join("\n"), sources: appsAvail().slice(), cadence: "daily", tier: "default", hue: 42, look: { shape: "orb", eyes: "wide", acc: "none", orbits: "three" }, vips: [], repoMode: "none", repoList: [], rev: 0 };
+  return { pid: newId("dot_"), role: "lead", voiceName: "", name: "Friday", responsibility: LEAD_JOB, rulesText: LEAD_RULES.join("\n"), sources: appsAvail().slice(), notebook: true, cadence: "daily", tier: "complex", hue: 42, look: { shape: "orb", eyes: "wide", acc: "none", orbits: "three" }, vips: [], repoMode: "none", repoList: [], rev: 0 };
 }
 export function openExistingLead() { const l = leadOf(); if (l) { openDot(l.id, "know"); return true; } return false; }
 
@@ -40,4 +40,4 @@ export function teamLines(lead) {
     return `- ${clean(x.name)}: ${clean(x.responsibility).replace(/\s+/g, " ").slice(0, 160)}${js.length ? ` Jobs: ${js.map(jobTitle).join(", ")}.` : ""}${l?.headline ? ` Latest note (${ago(l.at)}): ${clean(l.headline).slice(0, 140)}` : ""}${w ? ` ${plural(w, "ask")} waiting.` : ""}`;
   }).join("\n") + "\n";
 }
-export const LEAD_SELF = "You are the owner's super atom: the one that looks across all their atoms and apps, learns how they like to work, and guards their attention. You tell them only what is worth their time.";
+export const LEAD_SELF = "You are the owner's super atom, their chief of staff: you look across all their atoms and apps, keep track of what they're driving and what's open, and guard their attention. You're judged by insight, not coverage: connect signals from different places, see what's coming, chase what's been waiting, and say what you'd do and why. Never just repeat what another atom already said.";
